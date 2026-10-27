@@ -1120,7 +1120,27 @@
         padding: 18px 16px;
       }
     }
-  </style>
+
+#context-panel{max-height:calc(100vh - 190px);overflow-y:auto}
+#telemetry-panel{border-top:1px solid #46534e;margin-top:14px;padding-top:14px}
+#telemetry-panel h3{margin-bottom:3px}.sim-label{font-size:10px;color:#d3b881}
+#sensor-readings{font-size:17px;color:#8ff0ca;font-variant-numeric:tabular-nums;margin-top:10px}
+#sample-state,#buffer-state,#radio-log,#telemetry-panel small{font-size:11px;line-height:1.5}
+#radio-log{white-space:pre-wrap;color:#abbcb5;min-height:40px}
+#radio-mode{width:100%;background:#18282b;color:#e3eee7;border:1px solid #526660;padding:7px;border-radius:5px;font-size:11px}
+#radio-state{color:#e9bc76}#radio-state[data-link="on"]{color:#8ff0ca}
+.sensor-wave{height:28px;width:100%;color:#75c3ac;opacity:.65}
+@media(max-width:850px){#context-panel{max-height:none;overflow:visible}#telemetry-panel h3{display:block!important}}
+/* Entorno / personaje: los controles conservan la proyección del chaleco. */
+#canvas-3d-container canvas {filter:none}
+.chaleco-stage {isolation:isolate}
+#context-panel {position:fixed;right:22px;top:170px;width:250px;padding:18px;background:rgba(13,19,21,.94);border:1px solid #455054;border-radius:12px;z-index:22;font-size:13px;line-height:1.6;color:#d7dedb}
+#context-panel h3 {margin:0 0 8px;color:#e9bb76;font-size:12px;letter-spacing:2px}
+#context-panel p {margin:7px 0}
+#situation-select {width:100%;padding:12px;background:#172226;color:#eee;border:1px solid #65756c;border-radius:7px;margin:8px 0 18px}
+#triage-evidence {font-size:13px;line-height:1.5;color:#c9decf;margin:8px 0}
+@media(max-width:850px){html,body{height:auto;overflow-y:auto}#app{height:auto;max-height:none;min-height:100vh}header,footer,main,#context-panel{flex-shrink:0}#context-panel{position:relative;top:auto;right:auto;width:auto;margin:5px 12px;padding:9px;font-size:11px}#context-panel h3{display:none}#context-panel p{margin:2px}main{min-height:300px}}
+</style>
 
   <script type="importmap">
   {
@@ -1217,11 +1237,17 @@
     </header>
 
     <!-- Center: Chaleco 3D (frontal fixed view) with interactive hotspots -->
-    <main>
+    <aside id="context-panel" aria-live="polite"><h3>ESCENA · SUPERVIVIENTE</h3><p id="scene-title"></p><p id="scene-description"></p><p id="scene-body"></p><p id="scene-visibility"></p><p id="n95-visible"></p>
+<section id="telemetry-panel"><h3>WTS · TELEMETRÍA</h3><span class="sim-label">SIMULACIÓN · no son mediciones reales</span>
+<div id="sensor-readings">— lpm · SpO₂ —% · — °C</div><div id="sample-state">Sensores apagados</div>
+<svg class="sensor-wave" viewBox="0 0 240 26" aria-hidden="true"><path d="M0 15H35L40 12 45 15H65L70 22 77 2 84 23 90 15H135L140 12 145 15H165L170 22 177 2 184 23 190 15H240" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+<label for="radio-mode">Enlace de radio simulado</label><select id="radio-mode"><option value="auto">Automático · señal intermitente</option><option value="offline">Sin enlace · guardar datos</option><option value="online">Restablecer enlace · reenviar</option></select>
+<p id="radio-state" role="status">APAGADO · sensores y radio sin alimentación</p><p id="buffer-state">0 pendientes · 0 confirmados</p><pre id="radio-log"></pre><small>Memoria de esta partida: incluye lecturas y respuestas de triage. Se vacía al reiniciar. No se envía nada a una red real.</small></section></aside><main>
       <div class="chaleco-stage" id="chaleco-stage">
         <!-- 3D Canvas element -->
         <div id="canvas-3d-container"></div>
 
+        <div style="position:absolute;inset:0;transform:scale(.691);z-index:3">
         <!-- Fallback Image (automatic if WebGL or OBJ fails) -->
         <img src="chaleco.png" alt="Chaleco de supervivencia WTS" class="chaleco-img" id="chaleco-fallback-img" style="display: none;">
 
@@ -1254,6 +1280,7 @@
         <!-- Bolsillo (Silbato, linterna, tapabocas) -->
         <div class="hotspot" id="zone-bolsillo" data-tooltip="Bolsillo (Silbato, Linterna, Tapabocas)" tabindex="0"></div>
       </div>
+      </div>
     </main>
 
     <!-- Bottom: Active question and single-line message -->
@@ -1265,7 +1292,7 @@
           <span class="triage-timer" id="triage-timer">Expira en 2 turnos</span>
         </div>
         <div class="triage-question" id="triage-question-text">¿Qué tanto te cuesta respirar?</div>
-        <div class="triage-buttons-grid">
+        <div id="triage-evidence"></div><div class="triage-buttons-grid">
           <button class="btn-relief btn-triage-1" data-answer="1">
             <div class="dots-container">
               <span class="dot-relief"></span>
@@ -1320,10 +1347,10 @@
     <div class="modal-card">
       <h2 class="modal-title">WTS — Protocolo de supervivencia</h2>
       <div class="modal-body">
-        <ul class="instructions-list">
+        <label for="situation-select">Situación inicial</label><select id="situation-select"><option value="0">01 · Losa sobre la pierna</option><option value="1">02 · Refugio entre vigas</option><option value="2">03 · Pasillo colapsado</option></select><ul class="instructions-list">
           <li>
             <span class="step-num">1</span>
-            <span>Estás atrapada bajo los escombros tras un terremoto. El chaleco es tu interfaz.</span>
+            <span>Una persona anónima lleva el WTS entre escombros. Controlas sus acciones; no hay avatar personalizable.</span>
           </li>
           <li>
             <span class="step-num">2</span>
@@ -1410,6 +1437,100 @@
     (function() {
       'use strict';
 
+      const situations = [
+        {title:'Losa sobre la pierna',description:'Un hueco bajo una placa de concreto. Una losa comprime la pierna izquierda; no intentes retirarla.',pain:3,trap:4,mobility:3,body:'Sientes presión continua en la pierna. Puedes mover las manos y la pierna derecha, pero no liberar la izquierda.'},
+        {title:'Refugio entre vigas',description:'Dos vigas mantienen un pequeño espacio de aire. Hay cascotes alrededor, pero ningún miembro está comprimido.',pain:1,trap:2,mobility:2,body:'Tienes raspones y molestias leves. Puedes mover brazos y piernas, aunque el hueco no te permite salir.'},
+        {title:'Pasillo colapsado',description:'El techo cayó sobre la salida. Tu antebrazo izquierdo está inmovilizado por fragmentos de concreto.',pain:4,trap:3,mobility:3,body:'El dolor del brazo es intenso. Puedes mover la mano derecha y ambas piernas; el brazo izquierdo no se libera.'}
+      ];
+      let situation = situations[0];
+      let npc, debris, compressionSlab, npcMask, sensorPatch, sensorLed;
+      function selectSituation(){
+        situation = situations[Number(document.getElementById('situation-select').value)];
+        if(compressionSlab){compressionSlab.visible=situation!==situations[1];compressionSlab.position.set(situation===situations[2]?-.68:-.28,situation===situations[2]?-.25:-1.08,.42);}
+      }
+      function bodyEvidence(id){
+        if(id===1) return aire<40?'Apenas entra aire y respirar requiere mucho esfuerzo.':aire<65?'Toses y necesitas hacer pausas para respirar.':tapabocasPuesto?'Con el N95 respiras con normalidad; no sientes falta de aire.':'El polvo irrita la garganta, pero aún puedes respirar sin esfuerzo importante.';
+        return id===2?('Dolor: '+situation.body):id===3?situation.description:situation.body;
+      }
+      function updateContext(){
+        document.getElementById('scene-title').textContent=situation.title;
+        document.getElementById('scene-description').textContent=situation.description;
+        document.getElementById('scene-body').textContent=bodyEvidence(activeQuestion?activeQuestion.id:4);
+        document.getElementById('scene-visibility').textContent=linternaEncendida?'Linterna encendida · se distinguen concreto, varillas y la zona de atrapamiento.':'Penumbra · usa la linterna del bolsillo para inspeccionar los escombros.';
+        document.getElementById('triage-evidence').textContent=activeQuestion?bodyEvidence(activeQuestion.id)+' Escala: 1 = ninguna dificultad / libre; 2 = leve; 3 = importante; 4 = extrema / inmóvil.':'';
+      }
+      const telemetry = {queue:[], sent:0, nextSample:0, nextTry:0, ackAt:0, started:0, last:null, events:[], packet:[], seq:0};
+      function logRadio(text){telemetry.events.unshift(text);telemetry.events=telemetry.events.slice(0,4);}
+      function resetTelemetry(){Object.assign(telemetry,{queue:[],sent:0,nextSample:0,nextTry:0,ackAt:0,started:0,last:null,events:[],packet:[],seq:0});}
+      function updateTelemetry(){
+        if(npcMask) npcMask.visible=tapabocasPuesto;
+        const on=chalecoEncendido&&bateria>0;
+        if(sensorLed) sensorLed.material.emissiveIntensity=on?(1.2+Math.sin(Date.now()*.008)*.7):0;
+        document.getElementById('n95-visible').textContent=tapabocasPuesto?'N95 colocado · visible en el personaje':'N95 guardado en el bolsillo';
+        const status=document.getElementById('radio-state');
+        if(!on){status.textContent='APAGADO · sensores y radio sin alimentación';return;}
+        const now=Date.now();
+        if(!telemetry.started) telemetry.started=now;
+        const mode=document.getElementById('radio-mode').value;
+        const elapsed=now-telemetry.started;
+        const linked=mode==='online'||(mode==='auto'&&Math.floor(elapsed/1000)%24>=9&&turno!==4&&turno!==11);
+        if(!partidaTerminada){
+          if(now>=telemetry.nextSample){
+            telemetry.last={id:++telemetry.seq,pulse:Math.round(76+(100-aire)*.36+situation.pain*3+Math.sin(elapsed*.001)*2),spo2:Math.round(98-(100-aire)*.1),temp:(34+temperatura*.035).toFixed(1),triage:{...answeredQuestions}};
+            telemetry.queue.push(telemetry.last); telemetry.nextSample=now+2000;
+          }
+          if(telemetry.ackAt&&now>=telemetry.ackAt){
+            if(linked){const ids=new Set(telemetry.packet.map(r=>r.id));telemetry.queue=telemetry.queue.filter(r=>!ids.has(r.id));telemetry.sent+=ids.size;logRadio('✓ ACK simulado: '+ids.size+' registros confirmados.');}
+            else logRadio('Sin ACK: registros conservados para reintento.');
+            telemetry.ackAt=0;telemetry.packet=[];
+          }
+          if(!telemetry.ackAt&&now>=telemetry.nextTry&&telemetry.queue.length){
+            telemetry.nextTry=now+4500;
+            if(linked){telemetry.packet=telemetry.queue.slice();telemetry.ackAt=now+1300;logRadio('↗ Enviando '+telemetry.packet.length+' registros; esperando ACK…');}
+            else logRadio('↻ Intento sin enlace. Datos guardados en memoria de la partida.');
+          }
+        }
+        status.textContent=partidaTerminada?'SESIÓN FINALIZADA · lecturas detenidas':telemetry.ackAt?'TRANSMITIENDO · esperando confirmación':linked?'ENLACE DISPONIBLE · baliza activa':'SIN CONFIRMACIÓN · almacenando y reintentando';
+        status.dataset.link=linked?'on':'off';
+        const r=telemetry.last;
+        document.getElementById('sensor-readings').textContent=r?`${r.pulse} lpm · SpO₂ ${r.spo2}% · ${r.temp} °C`:'Iniciando lectura…';
+        document.getElementById('sample-state').textContent=r?`Lectura #${r.id} · parche activo · muestreo cada 2 s`:'Esperando primera lectura';
+        document.getElementById('buffer-state').textContent=`${telemetry.queue.length} pendientes en memoria · ${telemetry.sent} confirmados`;
+        document.getElementById('radio-log').textContent=telemetry.events.join('\n');
+      }
+      function buildEnvironment(){
+        debris=new THREE.Group(); scene.add(debris);
+        const concrete=new THREE.MeshStandardMaterial({color:0x62615a,roughness:1});
+        const cloth=new THREE.MeshStandardMaterial({color:0x343f44,roughness:1});
+        const skin=new THREE.MeshStandardMaterial({color:0x9b8878,roughness:.95});
+        function block(parent,geo,mat,x,y,z,sx,sy,sz){const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);m.scale.set(sx,sy,sz);parent.add(m);return m;}
+        const box=new THREE.BoxGeometry(1,1,1),sphere=new THREE.SphereGeometry(1,20,14);
+        block(debris,box,concrete,0,-1.6,-.7,6,.22,4);
+        block(debris,box,concrete,0,1.65,-1.3,5,.4,1.4).rotation.z=-.12;
+        block(debris,box,concrete,-1.6,0,-1.3,.5,3,1);
+        block(debris,box,concrete,1.6,0,-1.3,.5,3,1);
+        let seed=16; const rand=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};
+        for(let i=0;i<65;i++){const x=(rand()-.5)*5; const y=rand()*3-1.5; if(Math.abs(x)<.85&&y>-.95&&y<1.4)continue; const m=block(debris,box,concrete,x,y,-.75+rand()*.45,.15+rand()*.6,.1+rand()*.4,.2+rand()*.4);m.rotation.set(rand(),rand(),rand());}
+        const iron=new THREE.MeshStandardMaterial({color:0x503b2c,roughness:.9});
+        for(let i=0;i<12;i++){const m=block(debris,new THREE.CylinderGeometry(.013,.013,1.1,6),iron,(i%2?1:-1)*(1+rand()*.8),rand()*2-1,-.2,1,1,1);m.rotation.z=rand()*2;}
+        npc=new THREE.Group();modelPivot.add(npc);
+        block(npc,sphere,skin,0,1.05,0,.23,.3,.22);
+        block(npc,new THREE.CylinderGeometry(.12,.14,.3,16),skin,0,.8,0,1,1,1);
+        for(const side of [-1,1]){block(npc,sphere,cloth,side*.65,-.15,-.08,.16,.62,.17);block(npc,sphere,skin,side*.66,-.69,.05,.12,.16,.12);block(npc,sphere,cloth,side*.28,-1.05,-.05,.23,.55,.24);}
+        // N95 de copa, costura y elásticos: todo sigue la cabeza del NPC.
+        npcMask=new THREE.Group();npc.add(npcMask);npcMask.visible=false;
+        const maskMat=new THREE.MeshStandardMaterial({color:0xf3f1df,roughness:.9});
+        block(npcMask,sphere,maskMat,0,.995,.205,.195,.135,.115);
+        const seam=new THREE.LineBasicMaterial({color:0xa6aa9e});
+        function maskLine(points){const g=new THREE.BufferGeometry().setFromPoints(points.map(p=>new THREE.Vector3(...p)));npcMask.add(new THREE.Line(g,seam));}
+        maskLine([[0,.87,.27],[0,1,.322],[0,1.12,.255]]);
+        for(const side of [-1,1]) maskLine([[side*.16,1.08,.24],[side*.245,1.1,.03],[side*.24,.94,.02],[side*.16,.92,.24]]);
+        sensorPatch=block(npc,new THREE.BoxGeometry(1,1,1),new THREE.MeshStandardMaterial({color:0xe6dfca,roughness:.8}),0,.77,.19,.14,.09,.04);
+        sensorLed=block(npc,sphere,new THREE.MeshStandardMaterial({color:0x53e9be,emissive:0x27d99c,emissiveIntensity:0}),.043,.775,.218,.018,.018,.012);
+        compressionSlab=block(debris,box,concrete,-.28,-1.08,.42,.72,.27,.7);compressionSlab.rotation.z=-.18;
+        scene.background=new THREE.Color(0x090e10);
+        selectSituation();
+      }
       // State variables as strictly specified in CONTRATO.md
       let turno = 1;
       let temperatura = 80;
@@ -1786,7 +1907,7 @@
         const porAlto  = (maxY / 2) / tv;
         const porAncho = (anchoGirado / 2) / (tv * camera.aspect);
 
-        cameraBaseDist = Math.max(porAlto, porAncho) * 1.14; // margen
+        cameraBaseDist = Math.max(porAlto, porAncho) * 1.65; // margen
         camera.position.set(0, 0, cameraBaseDist);
         camera.lookAt(0, 0, 0);
         camera.updateProjectionMatrix();
@@ -1841,16 +1962,16 @@
           canvas3DContainer.appendChild(renderer.domElement);
 
           // Lighting: soft ambient so penumbra looks natural
-          const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
+          const ambientLight = new THREE.AmbientLight(0x93adc2, 0.16);
           scene.add(ambientLight);
 
           // Main directional light for folds & texture relief
-          dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+          dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
           dirLight.position.set(3, 4, 4);
           scene.add(dirLight);
 
           // Rear fill light
-          const fillLight = new THREE.DirectionalLight(0xdde8ff, 0.5);
+          const fillLight = new THREE.DirectionalLight(0xdde8ff, 0.12);
           fillLight.position.set(-3, 2, -2);
           scene.add(fillLight);
 
@@ -1860,6 +1981,7 @@
           scene.add(flashlightLight);
 
           scene.add(modelPivot);
+          buildEnvironment();
 
           // Loading manager
           let totalItems = 5;
@@ -1976,7 +2098,7 @@
 
             // Flashlight real light control
             if (flashlightLight) {
-              const targetIntensity = linternaEncendida ? 2.8 : 0;
+              const targetIntensity = linternaEncendida ? 9 : 0;
               flashlightLight.intensity += (targetIntensity - flashlightLight.intensity) * 0.15;
             }
 
@@ -2013,9 +2135,10 @@
             vaivenT += 0.0045;
             const giro = Math.sin(vaivenT) * 0.13;          // ~7.5 grados
             const cabeceo = Math.sin(vaivenT * 0.7) * 0.025;
-            modelPivot.rotation.y = giro;
-            modelPivot.rotation.z = Math.sin(vaivenT * 0.45) * 0.012;
-            modelPivot.position.y = cabeceo;
+            modelPivot.rotation.y = 0;
+            modelPivot.rotation.z = 0;
+            modelPivot.position.y = 0;
+            if(npc) npc.scale.y=1+Math.sin(performance.now()*.002)*.003;
 
             renderer.render(scene, camera);
           }
@@ -2148,6 +2271,8 @@
       }
 
       function updateUI() {
+        updateContext();
+        updateTelemetry();
         actualizarFicha();
 
         // Tasa de perdida termica actual, para que se vea el efecto de
@@ -2399,9 +2524,7 @@
         return Math.min(p, 0.90);
       }
 
-      const PROTOCOLO = 'Le canalizaron una vía de grueso calibre y le pasaron suero salino ' +
-        'antes de mover la losa, más bicarbonato para frenar la subida de potasio, y dos ' +
-        'torniquetes por encima de la pierna justo antes de levantarla.';
+      const PROTOCOLO = 'El equipo evaluó la compresión y estabilizó a la persona antes de movilizarla, según su protocolo clínico. Esta simulación no sustituye formación médica ni instrucciones de rescate.';
 
       function textoAplastamiento() {
         const quieta = turno - turnoUltimoMovimiento;
@@ -2424,6 +2547,7 @@
         const q3 = answeredQuestions[3] !== null;
         const q4 = answeredQuestions[4] !== null;
 
+        if(situation===situations[1]){endGame('PERSONA RESCATADA','El equipo localizó el refugio y confirmó que no había miembros comprimidos. '+(q1&&q2&&q3&&q4?'Las cuatro respuestas ayudaron a preparar la atención.':'La información incompleta requirió una evaluación adicional en el lugar.'),true);return;}
         // Te encuentran por la baliza y los signos vitales del parche, no
         // por el triage: por eso llegan hasta ti aunque no hayas respondido
         // nada. Lo que los sensores NO pueden ver es la compresion de un
@@ -2456,7 +2580,7 @@
               true
             );
           } else {
-            endGame('SÍNDROME DE APLASTAMIENTO', textoAplastamiento(), false);
+            endGame('RESCATE CON INFORMACIÓN INSUFICIENTE', 'El equipo debe evaluar la compresión antes de mover los escombros. Sin la respuesta de atrapamiento no pudo anticipar este riesgo. La compresión prolongada puede causar complicaciones graves; el desenlace no se puede predecir solo con estos datos.', false);
           }
         }
       }
@@ -2603,13 +2727,16 @@
         activeQuestion = null;
         activeQuestionStartTurn = null;
 
-        showMessage(`Respuesta de triage registrada (nivel ${nivel}). Datos transmitidos.`);
+        const esperado=qId===1?(aire<40?4:aire<65?3:tapabocasPuesto?1:2):qId===2?situation.pain:qId===3?situation.trap:situation.mobility;
+        showMessage(nivel===esperado?`Nivel ${nivel} registrado: coincide con las señales de esta situación.`:`Nivel ${nivel} transmitido. Revisa las sensaciones descritas para valorar la situación; no se penaliza tu respuesta.`);
         advanceTurn();
       }
 
       // Reset game
       function resetGame() {
         stopAllTimers();
+        selectSituation();
+        resetTelemetry();
         umbralesDisparados.clear();
         generarEventos();
         turnoUltimoMovimiento = 1;
@@ -2656,6 +2783,7 @@
       // Event Listeners
       btnEmpezar.addEventListener('click', () => {
         if (btnEmpezar.disabled) return;
+        selectSituation();
         modalStart.classList.remove('active');
         showMessage("Estás atrapada bajo los escombros a oscuras. Enciende el chaleco para comenzar.");
         partidaIniciada = true;
