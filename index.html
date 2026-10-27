@@ -1,0 +1,2720 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>WTS — Protocolo de supervivencia</title>
+  <style>
+    /* Reset & Base */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #0b0d11;
+      color: #e6edf3;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    /* Subtle procedural dust texture background without external images */
+    body {
+      background-image:
+        radial-gradient(1.5px 1.5px at 15% 20%, rgba(200, 200, 200, 0.12), transparent),
+        radial-gradient(1.2px 1.2px at 45% 35%, rgba(200, 200, 200, 0.09), transparent),
+        radial-gradient(1.8px 1.8px at 80% 25%, rgba(200, 200, 200, 0.11), transparent),
+        radial-gradient(1.5px 1.5px at 30% 75%, rgba(200, 200, 200, 0.1), transparent),
+        radial-gradient(1.3px 1.3px at 70% 85%, rgba(200, 200, 200, 0.08), transparent),
+        radial-gradient(2px 2px at 90% 60%, rgba(200, 200, 200, 0.12), transparent),
+        radial-gradient(circle at center, #151a21 0%, #08090d 100%);
+    }
+
+    /* Screen shake for replicas */
+    .screen-shake {
+      animation: earthquake 0.65s cubic-bezier(.36,.07,.19,.97) both;
+    }
+
+    @keyframes earthquake {
+      10%, 90% { transform: translate3d(-3px, 2px, 0) rotate(-0.5deg); }
+      20%, 80% { transform: translate3d(4px, -3px, 0) rotate(0.8deg); }
+      30%, 50%, 70% { transform: translate3d(-5px, 4px, 0) rotate(-1deg); }
+      40%, 60% { transform: translate3d(5px, -4px, 0) rotate(1deg); }
+    }
+
+    /* Vest vibration animation for fallback image */
+    .chaleco-vibrate {
+      animation: vestPulse 0.4s ease-in-out infinite alternate;
+    }
+
+    @keyframes vestPulse {
+      0% { filter: drop-shadow(0 0 4px rgba(88, 166, 255, 0.3)); transform: scale(1); }
+      100% { filter: drop-shadow(0 0 18px rgba(88, 166, 255, 0.8)); transform: scale(1.015); }
+    }
+
+    /* Slow pulse for guided breathing for fallback image */
+    .chaleco-breathe {
+      animation: vestBreathe 4s ease-in-out infinite;
+    }
+
+    @keyframes vestBreathe {
+      0% { filter: drop-shadow(0 0 4px rgba(46, 204, 113, 0.2)); transform: scale(1); }
+      50% { filter: drop-shadow(0 0 16px rgba(46, 204, 113, 0.7)); transform: scale(1.015); }
+      100% { filter: drop-shadow(0 0 4px rgba(46, 204, 113, 0.2)); transform: scale(1); }
+    }
+
+    /* App container */
+    #app {
+      display: flex;
+      flex-direction: column;
+      width: 100vw;
+      height: 100vh;
+      max-width: 100vw;
+      max-height: 100vh;
+      position: relative;
+    }
+
+    /* Header Bar */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 12px 18px;
+      z-index: 20;
+      background: linear-gradient(180deg, rgba(11, 13, 17, 0.95) 0%, rgba(11, 13, 17, 0) 100%);
+      pointer-events: none;
+    }
+
+    .status-bars {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      pointer-events: auto;
+      width: 250px;
+      max-width: 48vw;
+    }
+
+    .bar-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .bar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #8b949e;
+    }
+
+    .bar-val {
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      color: #c9d1d9;
+    }
+
+    .bar-track {
+      width: 100%;
+      height: 7px;
+      background: rgba(33, 38, 45, 0.85);
+      border-radius: 4px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      /* Lineal y corta: la barra baja a la par del reloj, no a saltos. */
+      transition: width 0.2s linear, background-color 0.35s ease;
+    }
+
+    /* Normal bar colors */
+    .fill-temp { background: linear-gradient(90deg, #f39c12, #e67e22); }
+    .fill-aire { background: linear-gradient(90deg, #3498db, #2980b9); }
+    .fill-bat { background: linear-gradient(90deg, #2ecc71, #27ae60); }
+    .fill-loc { background: linear-gradient(90deg, #9b59b6, #8e44ad); }
+
+    /* Low state: RED under 30 as required */
+    .bar-fill.bar-danger {
+      background: #e74c3c !important;
+      animation: alertPulse 1.2s infinite alternate;
+    }
+
+    @keyframes alertPulse {
+      0% { opacity: 0.75; }
+      100% { opacity: 1; filter: drop-shadow(0 0 4px #e74c3c); }
+    }
+
+    /* Turn & Time Display */
+    .turn-box {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      pointer-events: auto;
+    }
+
+    .turn-badge {
+      background: rgba(22, 27, 34, 0.9);
+      border: 1px solid rgba(56, 139, 253, 0.4);
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #58a6ff;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    }
+
+    .time-badge {
+      font-size: 0.76rem;
+      color: #8b949e;
+      font-variant-numeric: tabular-nums;
+      font-weight: 500;
+      letter-spacing: 0.3px;
+    }
+
+    .btn-3d {
+      margin-top: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(33, 38, 45, 0.8);
+      color: #8b949e;
+      text-decoration: none;
+      font-size: 0.72rem;
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.2s ease;
+    }
+
+    .btn-3d:hover {
+      color: #58a6ff;
+      border-color: rgba(88, 166, 255, 0.4);
+      background: rgba(88, 166, 255, 0.1);
+    }
+
+    /* Main Center: Chaleco 3D Stage & Hotspots */
+    main {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+      padding: 6px 12px;
+    }
+
+    .chaleco-stage {
+      position: relative;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      /* height real, no solo max-height: el canvas va en position:absolute
+         y la imagen de respaldo en display:none, asi que nada en el flujo
+         le da tamano al contenedor y colapsaba a 0 x 0. */
+      height: 64vh;
+      max-width: 92vw;
+      aspect-ratio: 1145 / 1374;
+    }
+
+    /* Tasa de perdida junto al nombre de la barra */
+    .bar-rate {
+      font-size: 0.7em;
+      opacity: 0.65;
+      font-weight: 400;
+      margin-left: 4px;
+    }
+
+    /* Indicadores de equipo desplegado */
+    .equipo-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 2px;
+    }
+    .equipo-chip {
+      font-size: 0.62rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 99px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      color: rgba(255, 255, 255, 0.35);
+      transition: all 0.25s ease;
+    }
+    .equipo-chip.activo {
+      border-color: #46c28a;
+      color: #9ff0c8;
+      background: rgba(70, 194, 138, 0.14);
+      box-shadow: 0 0 10px rgba(70, 194, 138, 0.25);
+    }
+
+    /* Ventana grande de aviso de evento */
+    #aviso-evento {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 60;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    #aviso-evento.visible { opacity: 1; }
+    .aviso-caja {
+      text-align: center;
+      padding: 26px 40px;
+      border-radius: 16px;
+      background: rgba(10, 12, 18, 0.93);
+      border: 2px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75);
+      max-width: 88vw;
+      transform: scale(0.9);
+      transition: transform 0.3s cubic-bezier(.2,.9,.3,1.3);
+    }
+    #aviso-evento.visible .aviso-caja { transform: scale(1); }
+    .aviso-emoji {
+      font-size: 3.4rem;
+      line-height: 1;
+      display: block;
+      margin-bottom: 10px;
+    }
+    .aviso-titulo {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      margin-bottom: 6px;
+    }
+    .aviso-texto {
+      font-size: 0.86rem;
+      opacity: 0.82;
+      max-width: 380px;
+      line-height: 1.45;
+    }
+    .aviso-caja.peligro { border-color: rgba(230, 80, 70, 0.6); }
+    .aviso-caja.bueno   { border-color: rgba(70, 194, 138, 0.6); }
+    .aviso-caja.alerta  { border-color: rgba(240, 180, 60, 0.6); }
+    @media (max-width: 600px) {
+      .aviso-emoji { font-size: 2.6rem; }
+      .aviso-caja { padding: 20px 24px; }
+    }
+
+    /* Cuenta regresiva del turno */
+    .turn-countdown {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+      justify-content: flex-end;
+    }
+    .countdown-track {
+      width: 92px;
+      height: 4px;
+      border-radius: 99px;
+      background: rgba(255, 255, 255, 0.12);
+      overflow: hidden;
+    }
+    .countdown-fill {
+      height: 100%;
+      width: 100%;
+      border-radius: 99px;
+      background: #5aa9f0;
+      transition: width 0.25s linear, background 0.3s ease;
+    }
+    .countdown-fill.urgente { background: #ff7a6e; }
+    .countdown-num {
+      font-size: 0.64rem;
+      opacity: 0.6;
+      min-width: 30px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Aviso permanente de ventana de silencio */
+    .escuchando {
+      display: none;
+      margin-top: 7px;
+      padding: 5px 8px;
+      border-radius: 6px;
+      font-size: 0.63rem;
+      line-height: 1.3;
+      border: 1px solid rgba(240, 200, 70, 0.55);
+      background: rgba(240, 200, 70, 0.14);
+      color: #f6e3a0;
+    }
+    .escuchando.visible { display: block; }
+
+    /* Ficha de triage */
+    .triage-ficha {
+      margin-top: 10px;
+      padding: 8px 9px;
+      border-radius: 7px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(0, 0, 0, 0.35);
+      font-size: 0.68rem;
+    }
+    .ficha-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-size: 0.6rem;
+      opacity: 0.6;
+      margin-bottom: 6px;
+    }
+    .ficha-prio {
+      padding: 1px 7px;
+      border-radius: 99px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      background: rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.55);
+    }
+    .ficha-prio.p1 { background: rgba(70,194,138,.22); color: #8ce9bb; }
+    .ficha-prio.p2 { background: rgba(240,200,70,.22); color: #f2dc8e; }
+    .ficha-prio.p3 { background: rgba(240,150,60,.22); color: #f6c08a; }
+    .ficha-prio.p4 { background: rgba(230,80,70,.25);  color: #ff9e95; }
+    .ficha-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 2px 0;
+      opacity: 0.85;
+    }
+    .ficha-ans {
+      font-weight: 700;
+      min-width: 54px;
+      text-align: right;
+      color: rgba(255, 255, 255, 0.3);
+    }
+    .ficha-ans.n1 { color: #8ce9bb; }
+    .ficha-ans.n2 { color: #f2dc8e; }
+    .ficha-ans.n3 { color: #f6c08a; }
+    .ficha-ans.n4 { color: #ff9e95; }
+    .ficha-ans.sin { color: #ff9e95; opacity: 0.8; font-style: italic; }
+    .ficha-imu {
+      margin-top: 4px;
+      padding-top: 5px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.12);
+    }
+    .ficha-imu span:first-child { opacity: 0.6; font-size: 0.95em; }
+    .ficha-aviso {
+      margin-top: 6px;
+      font-size: 0.64rem;
+      line-height: 1.35;
+      color: #ffc98a;
+      display: none;
+    }
+    .ficha-aviso.visible { display: block; }
+
+    /* Mensajes del cuerpo (sensaciones) */
+    .body-msg {
+      color: #cfe3ff;
+      font-style: italic;
+    }
+
+    /* 3D Canvas Container */
+    #canvas-3d-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    #canvas-3d-container canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+      filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.8));
+    }
+
+    /* Fallback image (shown if WebGL or OBJ fails) */
+    .chaleco-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      pointer-events: none;
+      filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.7));
+      transition: transform 0.3s ease, filter 0.3s ease;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    /* Hotspot Zones - completely invisible until hover/touch */
+    .hotspot {
+      position: absolute;
+      border-radius: 6px;
+      cursor: pointer;
+      z-index: 15;
+      outline: 2px solid transparent;
+      transition: outline-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+    }
+
+    .hotspot:hover, .hotspot:focus-visible, .hotspot.active-touch {
+      outline: 2px solid rgba(255, 255, 255, 0.75);
+      box-shadow: 0 0 14px rgba(255, 255, 255, 0.35);
+      background-color: rgba(255, 255, 255, 0.06);
+    }
+
+    /* Tooltip tag on hover */
+    .hotspot::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 104%;
+      left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      background: rgba(13, 17, 23, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #f0f6fc;
+      padding: 4px 9px;
+      border-radius: 4px;
+      font-size: 0.74rem;
+      font-weight: 500;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 30;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+    }
+
+    .hotspot:hover::after, .hotspot.active-touch::after {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Hotspot positions matching chaleco frontal view exactly */
+    /* Cuello (Capucha térmica) */
+    #zone-cuello {
+      left: 37%;
+      top: 5%;
+      width: 26%;
+      height: 17%;
+      border-radius: 12px;
+    }
+
+    /* Sisas (Mangas térmicas) - both shoulders */
+    #zone-sisa-izq {
+      left: 12%;
+      top: 20%;
+      width: 14%;
+      height: 20%;
+      border-radius: 10px;
+    }
+
+    #zone-sisa-der {
+      left: 74%;
+      top: 20%;
+      width: 14%;
+      height: 20%;
+      border-radius: 10px;
+    }
+
+    /* Interruptor (Módulo electrónico del pecho) */
+    #zone-interruptor {
+      left: 52%;
+      top: 25%;
+      width: 16%;
+      height: 10%;
+      border-radius: 4px;
+    }
+
+    /* Triage buttons strip on chest */
+    #zone-botones-strip {
+      position: absolute;
+      left: 28.5%;
+      top: 26.5%;
+      width: 17.5%;
+      height: 4.5%;
+      display: flex;
+      justify-content: space-between;
+      align-items: stretch;
+      z-index: 15;
+    }
+
+    .triage-btn-vest {
+      flex: 1;
+      margin: 0 1px;
+      border-radius: 3px;
+      cursor: pointer;
+      position: relative;
+      outline: 1.5px solid transparent;
+      transition: all 0.2s ease;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .triage-btn-vest:hover, .triage-btn-vest:focus-visible {
+      outline: 2px solid #ffffff;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
+      transform: scale(1.08);
+      z-index: 20;
+    }
+
+    .triage-btn-vest::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 110%;
+      left: 50%;
+      transform: translateX(-50%) translateY(3px);
+      background: rgba(13, 17, 23, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #f0f6fc;
+      padding: 3px 7px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 30;
+    }
+
+    .triage-btn-vest:hover::after {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Dots representation inside buttons when active */
+    .vest-dots {
+      display: flex;
+      gap: 2px;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .question-active .vest-dots {
+      opacity: 0.9;
+    }
+
+    .vest-dot {
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    }
+
+    /* Bolsillo (inferior derecho) */
+    #zone-bolsillo {
+      left: 53%;
+      top: 60%;
+      width: 31%;
+      height: 25%;
+      border-radius: 12px;
+    }
+
+    /* Bottom: message line and triage question card */
+    footer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px 18px 16px 18px;
+      z-index: 20;
+      background: linear-gradient(0deg, rgba(11, 13, 17, 0.98) 0%, rgba(11, 13, 17, 0.8) 70%, rgba(11, 13, 17, 0) 100%);
+      gap: 8px;
+    }
+
+    /* Active Triage Banner */
+    #triage-card {
+      display: none;
+      width: 100%;
+      max-width: 620px;
+      background: rgba(22, 27, 34, 0.96);
+      border: 1px solid rgba(240, 136, 62, 0.5);
+      border-radius: 10px;
+      padding: 10px 14px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+      animation: slideUp 0.3s ease;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(12px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .triage-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .triage-tag {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #f0883e;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .triage-timer {
+      font-size: 0.7rem;
+      color: #8b949e;
+    }
+
+    .triage-question {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #ffffff;
+      margin-bottom: 10px;
+      line-height: 1.3;
+    }
+
+    /* Tactile Relief Buttons Grid: 1 to 4 with embossed dots */
+    .triage-buttons-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .btn-relief {
+      background: #161b22;
+      border: 2px solid;
+      border-radius: 8px;
+      padding: 8px 6px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+      box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.15), 0 3px 6px rgba(0, 0, 0, 0.4);
+    }
+
+    .btn-relief:hover, .btn-relief:focus-visible {
+      transform: translateY(-2px);
+      box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.3), 0 6px 14px rgba(0, 0, 0, 0.6);
+    }
+
+    .btn-relief:active {
+      transform: translateY(1px);
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Severity colors: verde, amarillo, naranja, rojo */
+    .btn-triage-1 {
+      border-color: #2ecc71;
+      color: #2ecc71;
+    }
+    .btn-triage-1:hover { background: rgba(46, 204, 113, 0.15); }
+
+    .btn-triage-2 {
+      border-color: #f1c40f;
+      color: #f1c40f;
+    }
+    .btn-triage-2:hover { background: rgba(241, 196, 15, 0.15); }
+
+    .btn-triage-3 {
+      border-color: #e67e22;
+      color: #e67e22;
+    }
+    .btn-triage-3:hover { background: rgba(230, 126, 34, 0.15); }
+
+    .btn-triage-4 {
+      border-color: #e74c3c;
+      color: #e74c3c;
+    }
+    .btn-triage-4:hover { background: rgba(231, 76, 60, 0.15); }
+
+    /* Embossed relief dots */
+    .dots-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 4px;
+      height: 12px;
+    }
+
+    .dot-relief {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.6);
+    }
+
+    .btn-relief-label {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: #8b949e;
+      letter-spacing: 0.3px;
+    }
+
+    /* Single message line centered at bottom */
+    .message-bar {
+      width: 100%;
+      max-width: 620px;
+      text-align: center;
+      font-size: 0.88rem;
+      color: #c9d1d9;
+      background: rgba(22, 27, 34, 0.85);
+      border: 1px solid rgba(48, 54, 61, 0.8);
+      border-radius: 6px;
+      padding: 8px 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      transition: background-color 0.2s ease, border-color 0.2s ease;
+    }
+
+    .message-bar.event-highlight {
+      border-color: #58a6ff;
+      background: rgba(31, 111, 235, 0.2);
+      color: #f0f6fc;
+    }
+
+    .message-bar.event-warning {
+      border-color: #f0883e;
+      background: rgba(240, 136, 62, 0.2);
+      color: #ffa657;
+    }
+
+    .message-bar.event-danger {
+      border-color: #f85149;
+      background: rgba(248, 81, 73, 0.2);
+      color: #ff7b72;
+    }
+
+    /* Modals & Overlays */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(11, 13, 17, 0.88);
+      backdrop-filter: blur(6px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.25s ease, visibility 0.25s ease;
+      padding: 16px;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal-card {
+      background: #161b22;
+      border: 1px solid rgba(48, 54, 61, 0.9);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 460px;
+      padding: 24px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
+      transform: translateY(10px);
+      transition: transform 0.25s ease;
+    }
+
+    .modal-overlay.active .modal-card {
+      transform: translateY(0);
+    }
+
+    .modal-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #f0f6fc;
+      margin-bottom: 12px;
+      letter-spacing: 0.3px;
+    }
+
+    .modal-body {
+      font-size: 0.9rem;
+      color: #8b949e;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+
+    .instructions-list {
+      list-style: none;
+      margin: 12px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .instructions-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      color: #c9d1d9;
+      font-size: 0.88rem;
+    }
+
+    .instructions-list li span.step-num {
+      background: #21262d;
+      color: #58a6ff;
+      border-radius: 50%;
+      width: 22px;
+      height: 22px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* Start screen preloader */
+    .preload-status-box {
+      margin-top: 14px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .preload-info {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #8b949e;
+    }
+
+    .preload-pct {
+      font-variant-numeric: tabular-nums;
+      color: #58a6ff;
+    }
+
+    .preload-bar-track {
+      width: 100%;
+      height: 6px;
+      background: #21262d;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .preload-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #1f6feb, #58a6ff);
+      border-radius: 3px;
+      transition: width 0.15s ease;
+    }
+
+    .btn-action-primary {
+      width: 100%;
+      background: #238636;
+      border: 1px solid rgba(240, 246, 252, 0.1);
+      color: #ffffff;
+      padding: 10px 18px;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-align: center;
+    }
+
+    .btn-action-primary:hover:not(:disabled) {
+      background: #2ea043;
+    }
+
+    .btn-action-primary:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      background: #21262d;
+      color: #8b949e;
+      border-color: #30363d;
+    }
+
+    /* Pocket Menu Modal */
+    .pocket-options-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .pocket-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 12px 14px;
+      transition: border-color 0.2s ease;
+    }
+
+    .pocket-item:hover {
+      border-color: #58a6ff;
+    }
+
+    .pocket-item-info h4 {
+      font-size: 0.92rem;
+      color: #f0f6fc;
+      margin-bottom: 3px;
+    }
+
+    .pocket-item-info p {
+      font-size: 0.76rem;
+      color: #8b949e;
+    }
+
+    .pocket-btn {
+      background: #21262d;
+      border: 1px solid rgba(240, 246, 252, 0.1);
+      color: #c9d1d9;
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .pocket-btn:hover:not(:disabled) {
+      background: #30363d;
+      color: #ffffff;
+      border-color: #58a6ff;
+    }
+
+    .pocket-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .pocket-btn.btn-active {
+      background: rgba(240, 136, 62, 0.2);
+      border-color: #f0883e;
+      color: #ffa657;
+    }
+
+    .btn-close-pocket {
+      width: 100%;
+      background: transparent;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-close-pocket:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: #c9d1d9;
+    }
+
+    /* Final Screen Specifics */
+    .final-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+
+    .final-badge.victory {
+      background: rgba(46, 204, 113, 0.2);
+      color: #2ecc71;
+      border: 1px solid rgba(46, 204, 113, 0.4);
+    }
+
+    .final-badge.defeat {
+      background: rgba(231, 76, 60, 0.2);
+      color: #e74c3c;
+      border: 1px solid rgba(231, 76, 60, 0.4);
+    }
+
+    .final-text {
+      font-size: 0.95rem;
+      color: #c9d1d9;
+      line-height: 1.55;
+      margin-bottom: 18px;
+    }
+
+    /* Responsive adjustments: mobile at 360px without horizontal scroll */
+    @media (max-width: 480px) {
+      header {
+        padding: 8px 10px;
+      }
+      .status-bars {
+        width: 170px;
+        gap: 5px;
+      }
+      .bar-header {
+        font-size: 0.65rem;
+      }
+      .bar-track {
+        height: 6px;
+      }
+      .turn-badge {
+        font-size: 0.78rem;
+        padding: 4px 9px;
+      }
+      .time-badge {
+        font-size: 0.68rem;
+      }
+      .btn-3d {
+        font-size: 0.65rem;
+        padding: 3px 7px;
+      }
+      .chaleco-stage {
+        height: 52vh;
+        max-width: 95vw;
+      }
+      footer {
+        padding: 6px 10px 10px 10px;
+      }
+      .triage-question {
+        font-size: 0.85rem;
+      }
+      .btn-relief {
+        padding: 6px 3px;
+      }
+      .dot-relief {
+        width: 5px;
+        height: 5px;
+      }
+      .btn-relief-label {
+        font-size: 0.6rem;
+      }
+      .message-bar {
+        font-size: 0.78rem;
+        padding: 6px 10px;
+      }
+      .modal-card {
+        padding: 18px 16px;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three.module.js"
+    }
+  }
+  </script>
+</head>
+<body>
+
+  <div id="app">
+    <!-- Top Header: Bars & Turn counter -->
+    <header>
+      <div class="status-bars">
+        <!-- Temperatura corporal -->
+        <div class="bar-item">
+          <div class="bar-header">
+            <span>Temperatura <span class="bar-rate" id="rate-temp">−6/turno</span></span>
+            <span class="bar-val" id="val-temp">80%</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill fill-temp" id="bar-temp" style="width: 80%;"></div>
+          </div>
+        </div>
+
+        <!-- Equipo desplegado -->
+        <div class="equipo-row">
+          <span class="equipo-chip" id="chip-capucha">Capucha</span>
+          <span class="equipo-chip" id="chip-mangas">Mangas</span>
+          <span class="equipo-chip" id="chip-n95">N95</span>
+          <span class="equipo-chip" id="chip-linterna">Linterna</span>
+        </div>
+        <div class="escuchando" id="chip-escuchando">👂 Están escuchando — es el momento del silbato</div>
+
+        <!-- Ficha de triage: respuestas dadas y prioridad -->
+        <div class="triage-ficha" id="triage-ficha">
+          <div class="ficha-title">Ficha de triage
+            <span class="ficha-prio" id="ficha-prio">Sin datos</span>
+          </div>
+          <div class="ficha-row"><span>Respirar</span><span class="ficha-ans" id="ans-1">—</span></div>
+          <div class="ficha-row"><span>Dolor</span><span class="ficha-ans" id="ans-2">—</span></div>
+          <div class="ficha-row"><span>Atrapamiento</span><span class="ficha-ans" id="ans-3">—</span></div>
+          <div class="ficha-row"><span>Movilidad</span><span class="ficha-ans" id="ans-4">—</span></div>
+          <div class="ficha-row ficha-imu"><span>Movimiento · IMU</span><span class="ficha-ans" id="ans-imu">—</span></div>
+          <div class="ficha-aviso" id="ficha-aviso"></div>
+        </div>
+
+        <!-- Aire respirable -->
+        <div class="bar-item">
+          <div class="bar-header">
+            <span>Aire</span>
+            <span class="bar-val" id="val-aire">100%</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill fill-aire" id="bar-aire" style="width: 100%;"></div>
+          </div>
+        </div>
+
+        <!-- Batería -->
+        <div class="bar-item">
+          <div class="bar-header">
+            <span>Batería</span>
+            <span class="bar-val" id="val-bat">100%</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill fill-bat" id="bar-bat" style="width: 100%;"></div>
+          </div>
+        </div>
+
+        <!-- Localización -->
+        <div class="bar-item">
+          <div class="bar-header">
+            <span>Localización</span>
+            <span class="bar-val" id="val-loc">0%</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill fill-loc" id="bar-loc" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="turn-box">
+        <div class="turn-badge" id="turn-badge">Turno 1 de 15</div>
+        <div class="turn-countdown" id="turn-countdown">
+          <div class="countdown-track"><div class="countdown-fill" id="countdown-fill"></div></div>
+          <span class="countdown-num" id="countdown-num">15 s</span>
+        </div>
+        <div class="time-badge" id="time-badge">Tiempo: 0 h 20 min</div>
+        <a href="visor.html" target="_blank" class="btn-3d" title="Ver chaleco en 3D libre">
+          <span>Ver en 3D ↗</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- Center: Chaleco 3D (frontal fixed view) with interactive hotspots -->
+    <main>
+      <div class="chaleco-stage" id="chaleco-stage">
+        <!-- 3D Canvas element -->
+        <div id="canvas-3d-container"></div>
+
+        <!-- Fallback Image (automatic if WebGL or OBJ fails) -->
+        <img src="chaleco.png" alt="Chaleco de supervivencia WTS" class="chaleco-img" id="chaleco-fallback-img" style="display: none;">
+
+        <!-- Cuello (Capucha térmica) -->
+        <div class="hotspot" id="zone-cuello" data-tooltip="Cuello (Capucha térmica)" tabindex="0"></div>
+
+        <!-- Sisas (Mangas térmicas) -->
+        <div class="hotspot" id="zone-sisa-izq" data-tooltip="Sisa izquierda (Mangas térmicas)" tabindex="0"></div>
+        <div class="hotspot" id="zone-sisa-der" data-tooltip="Sisa derecha (Mangas térmicas)" tabindex="0"></div>
+
+        <!-- Interruptor (Módulo electrónico) -->
+        <div class="hotspot" id="zone-interruptor" data-tooltip="Interruptor (Encender chaleco)" tabindex="0"></div>
+
+        <!-- Triage Buttons Strip (Over 4 colored buttons) -->
+        <div id="zone-botones-strip">
+          <div class="triage-btn-vest" id="vest-btn-1" data-triage="1" data-tooltip="Botón 1 punto (Verde)">
+            <div class="vest-dots"><span class="vest-dot"></span></div>
+          </div>
+          <div class="triage-btn-vest" id="vest-btn-2" data-triage="2" data-tooltip="Botón 2 puntos (Amarillo)">
+            <div class="vest-dots"><span class="vest-dot"></span><span class="vest-dot"></span></div>
+          </div>
+          <div class="triage-btn-vest" id="vest-btn-3" data-triage="3" data-tooltip="Botón 3 puntos (Naranja)">
+            <div class="vest-dots"><span class="vest-dot"></span><span class="vest-dot"></span><span class="vest-dot"></span></div>
+          </div>
+          <div class="triage-btn-vest" id="vest-btn-4" data-triage="4" data-tooltip="Botón 4 puntos (Rojo)">
+            <div class="vest-dots"><span class="vest-dot"></span><span class="vest-dot"></span><span class="vest-dot"></span><span class="vest-dot"></span></div>
+          </div>
+        </div>
+
+        <!-- Bolsillo (Silbato, linterna, tapabocas) -->
+        <div class="hotspot" id="zone-bolsillo" data-tooltip="Bolsillo (Silbato, Linterna, Tapabocas)" tabindex="0"></div>
+      </div>
+    </main>
+
+    <!-- Bottom: Active question and single-line message -->
+    <footer>
+      <!-- Triage question banner when active -->
+      <div id="triage-card">
+        <div class="triage-header">
+          <span class="triage-tag">● Triage activo</span>
+          <span class="triage-timer" id="triage-timer">Expira en 2 turnos</span>
+        </div>
+        <div class="triage-question" id="triage-question-text">¿Qué tanto te cuesta respirar?</div>
+        <div class="triage-buttons-grid">
+          <button class="btn-relief btn-triage-1" data-answer="1">
+            <div class="dots-container">
+              <span class="dot-relief"></span>
+            </div>
+            <span class="btn-relief-label">1 punto</span>
+          </button>
+          <button class="btn-relief btn-triage-2" data-answer="2">
+            <div class="dots-container">
+              <span class="dot-relief"></span>
+              <span class="dot-relief"></span>
+            </div>
+            <span class="btn-relief-label">2 puntos</span>
+          </button>
+          <button class="btn-relief btn-triage-3" data-answer="3">
+            <div class="dots-container">
+              <span class="dot-relief"></span>
+              <span class="dot-relief"></span>
+              <span class="dot-relief"></span>
+            </div>
+            <span class="btn-relief-label">3 puntos</span>
+          </button>
+          <button class="btn-relief btn-triage-4" data-answer="4">
+            <div class="dots-container">
+              <span class="dot-relief"></span>
+              <span class="dot-relief"></span>
+              <span class="dot-relief"></span>
+              <span class="dot-relief"></span>
+            </div>
+            <span class="btn-relief-label">4 puntos</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Single line message of latest event -->
+      <div class="message-bar" id="message-bar">
+        Estás atrapada bajo los escombros a oscuras. Enciende el chaleco para comenzar.
+      </div>
+    </footer>
+  </div>
+
+  <!-- Ventana grande de aviso de evento -->
+  <div id="aviso-evento">
+    <div class="aviso-caja" id="aviso-caja">
+      <span class="aviso-emoji" id="aviso-emoji">⚠️</span>
+      <div class="aviso-titulo" id="aviso-titulo"></div>
+      <div class="aviso-texto" id="aviso-texto"></div>
+    </div>
+  </div>
+
+  <!-- Start Screen Modal (Preloads 3D model behind it) -->
+  <div class="modal-overlay active" id="modal-start">
+    <div class="modal-card">
+      <h2 class="modal-title">WTS — Protocolo de supervivencia</h2>
+      <div class="modal-body">
+        <ul class="instructions-list">
+          <li>
+            <span class="step-num">1</span>
+            <span>Estás atrapada bajo los escombros tras un terremoto. El chaleco es tu interfaz.</span>
+          </li>
+          <li>
+            <span class="step-num">2</span>
+            <span>Haz clic sobre cada elemento del chaleco para activarlo; cada acción cuesta 20 minutos (1 turno).</span>
+          </li>
+          <li>
+            <span class="step-num">3</span>
+            <span>Responde el triage con los botones táctiles y resiste hasta que llegue el rescate.</span>
+          </li>
+        </ul>
+
+        <div class="preload-status-box">
+          <div class="preload-info">
+            <span id="preload-label">Cargando modelo 3D…</span>
+            <span class="preload-pct" id="preload-pct">0%</span>
+          </div>
+          <div class="preload-bar-track">
+            <div class="preload-bar-fill" id="preload-fill"></div>
+          </div>
+        </div>
+      </div>
+      <button class="btn-action-primary" id="btn-empezar" disabled>Cargando modelo…</button>
+    </div>
+  </div>
+
+  <!-- Pocket Menu Modal (Three options visible simultaneously) -->
+  <div class="modal-overlay" id="modal-pocket">
+    <div class="modal-card">
+      <h2 class="modal-title">Bolsillo del chaleco</h2>
+      <div class="modal-body">
+        <div class="pocket-options-list">
+          <!-- Silbato -->
+          <div class="pocket-item">
+            <div class="pocket-item-info">
+              <h4>Silbato</h4>
+              <p>Emite sonido acústico a la superficie</p>
+            </div>
+            <button class="pocket-btn" id="pocket-btn-silbato">Silbar</button>
+          </div>
+
+          <!-- Linterna -->
+          <div class="pocket-item">
+            <div class="pocket-item-info">
+              <h4>Linterna</h4>
+              <p id="linterna-status-text">Apagada (consume 12 de batería por turno si se enciende)</p>
+            </div>
+            <button class="pocket-btn" id="pocket-btn-linterna">Encender</button>
+          </div>
+
+          <!-- Tapabocas N95 -->
+          <div class="pocket-item">
+            <div class="pocket-item-info">
+              <h4>Tapabocas N95</h4>
+              <p id="tapabocas-status-text">Sin poner (reduce la pérdida de aire a 1 por turno)</p>
+            </div>
+            <button class="pocket-btn" id="pocket-btn-tapabocas">Ponerse</button>
+          </div>
+        </div>
+      </div>
+      <button class="btn-close-pocket" id="pocket-btn-cerrar">Cerrar bolsillo</button>
+    </div>
+  </div>
+
+  <!-- End Game Modal -->
+  <div class="modal-overlay" id="modal-final">
+    <div class="modal-card">
+      <span class="final-badge" id="final-badge">Rescate</span>
+      <h2 class="modal-title" id="final-title">RESCATADA CON ÉXITO</h2>
+      <div class="final-text" id="final-text">
+        El equipo llegó con tu triage completo. Sabían cómo estabas antes de moverte y te liberaron de forma segura.
+      </div>
+      <button class="btn-action-primary" id="btn-restart">Jugar de nuevo</button>
+    </div>
+  </div>
+
+  <!-- Game Logic & 3D Engine Script -->
+  <script type="module">
+    import * as THREE from './vendor/three.module.js';
+    import { OBJLoader } from './vendor/OBJLoader.js';
+    window.__THREE__ = THREE;
+    window.__OBJLOADER__ = { OBJLoader };
+
+    /* WTS - Protocolo de supervivencia Engine */
+    (function() {
+      'use strict';
+
+      // State variables as strictly specified in CONTRATO.md
+      let turno = 1;
+      let temperatura = 80;
+      let aire = 100;
+      let bateria = 100;
+      let localizacion = 0;
+
+      // Equipment & status flags
+      let chalecoEncendido = false;
+      let capuchaDesplegada = false;
+      let mangasDesplegadas = false;
+      let tapabocasPuesto = false;
+      let linternaEncendida = false;
+
+      // Environment & special conditions
+      let rescateDetectado = false;
+      let turnoRescateLlegada = null;
+      let respiracionGuiadaActiva = false;
+      let turnoRespiracionGuiada = null;
+
+      // Triage questions tracking: Turn 3, Turn 6, Turn 9, Turn 12
+      const triageQuestions = {
+        3: { id: 1, texto: "¿Qué tanto te cuesta respirar?" },
+        6: { id: 2, texto: "¿Qué tanto dolor tienes?" },
+        9: { id: 3, texto: "¿Qué tan atrapado está tu cuerpo por los escombros?" },
+        12: { id: 4, texto: "¿Qué tanto puedes mover brazos y piernas?" }
+      };
+
+      let activeQuestion = null;
+      let activeQuestionStartTurn = null;
+      let answeredQuestions = { 1: null, 2: null, 3: null, 4: null };
+      let missedQuestionsCount = 0;
+
+      // IMU (MPU6050): el chaleco detecta movimiento del cuerpo. Cualquier
+      // accion del jugador cuenta como movimiento; dejar vencer el turno, no.
+      let turnoUltimoMovimiento = 1;
+      let modoAutomatico = false;
+      let partidaTerminada = false;
+
+      // Timers array for complete cleanup
+      const activeTimers = [];
+
+      function safeSetTimeout(fn, ms) {
+        const id = setTimeout(fn, ms);
+        activeTimers.push(id);
+        return id;
+      }
+
+      function stopAllTimers() {
+        while (activeTimers.length > 0) {
+          clearTimeout(activeTimers.pop());
+        }
+        detenerRelojTurno();
+      }
+
+      // ---- Reloj del turno ------------------------------------------------
+      // El tiempo no lo controla el jugador: si no actua dentro del plazo,
+      // el turno pasa solo y la situacion empeora.
+      const SEGUNDOS_POR_TURNO = 20;
+
+      // ---- Eventos aleatorios ---------------------------------------------
+      // Las replicas y las ventanas de silencio ya no caen en turnos fijos:
+      // se sortean en cada partida, repartidas para que no se amontonen.
+      let turnosReplica = [];
+      let turnosSilencio = [];
+
+      function azarEntre(a, b) {
+        return a + Math.floor(Math.random() * (b - a + 1));
+      }
+
+      function generarEventos() {
+        turnosReplica = [azarEntre(3, 7), azarEntre(9, 13)];
+        turnosSilencio = [];
+        const franjas = [[4, 6], [8, 10], [12, 14]];
+        for (const [a, b] of franjas) {
+          let t, intentos = 0;
+          do {
+            t = azarEntre(a, b);
+            intentos++;
+          } while ((turnosReplica.includes(t) || turnosSilencio.includes(t)) && intentos < 12);
+          if (!turnosReplica.includes(t)) turnosSilencio.push(t);
+        }
+      }
+      generarEventos();
+      let relojTurno = null;
+      let restanteTurno = SEGUNDOS_POR_TURNO;
+      let partidaIniciada = false;
+
+      // ---- Deriva en vivo --------------------------------------------------
+      // El frio, el aire y la bateria no saltan al final del turno: bajan de a
+      // poquitos mientras corren los 20 segundos, en proporcion al tiempo que
+      // ha pasado. El total del turno es exactamente el de la tabla de la
+      // seccion 7 del contrato; lo que cambia es que ahora se ve bajar.
+      const PASO_DERIVA = 120;   // ms entre refrescos
+      let fraccionAplicada = 0;  // cuanto del turno ya se cobro, de 0 a 1
+      let inicioTurno = 0;       // instante real en que arranco el turno
+
+      // Lo que cuesta un turno COMPLETO con el estado de ahora. Se consulta en
+      // cada paso, asi que desplegar la capucha a mitad de turno frena la
+      // perdida de una vez, sin esperar al siguiente.
+      function tasasDelTurno() {
+        let bat = 0;
+        if (chalecoEncendido) bat = linternaEncendida ? -12 : -4;
+        else if (linternaEncendida) bat = -12;
+
+        let air = tapabocasPuesto ? -1 : -7;
+        if (turnoRespiracionGuiada !== null && turno === turnoRespiracionGuiada + 1) air = 0;
+
+        // Cada prenda aporta por separado: nada 6, solo capucha 3,
+        // solo mangas 4, ambas 1.
+        let temp = 6;
+        if (capuchaDesplegada) temp -= 3;
+        if (mangasDesplegadas) temp -= 2;
+        if (rescateDetectado) temp = temp / 2;
+
+        return {
+          bateria: bat,
+          localizacion: chalecoEncendido ? 10 : 0,
+          aire: air,
+          temperatura: -temp
+        };
+      }
+
+      // Cobra una fraccion del turno (0,006 en cada paso de 120 ms, o lo que
+      // falte cuando el jugador actua antes de que se acabe el tiempo).
+      function aplicarDeriva(fraccion) {
+        if (fraccion <= 0) return;
+        const t = tasasDelTurno();
+        bateria = Math.max(0, bateria + t.bateria * fraccion);
+        localizacion = Math.min(100, Math.max(0, localizacion + t.localizacion * fraccion));
+        aire = Math.max(0, aire + t.aire * fraccion);
+        temperatura = Math.max(0, temperatura + t.temperatura * fraccion);
+      }
+
+      function pintarReloj() {
+        const fill = document.getElementById('countdown-fill');
+        const num = document.getElementById('countdown-num');
+        const pct = Math.max(0, restanteTurno / SEGUNDOS_POR_TURNO) * 100;
+        if (fill) {
+          fill.style.width = pct + '%';
+          fill.classList.toggle('urgente', restanteTurno <= 5);
+        }
+        // restanteTurno ahora es fraccionario: se redondea hacia arriba para
+        // que el numero cambie justo cuando se completa cada segundo.
+        if (num) num.textContent = Math.ceil(Math.max(0, restanteTurno)) + ' s';
+      }
+
+      function detenerRelojTurno() {
+        if (relojTurno) {
+          clearInterval(relojTurno);
+          relojTurno = null;
+        }
+      }
+
+      function reiniciarRelojTurno() {
+        detenerRelojTurno();
+        if (partidaTerminada || !partidaIniciada) return;
+        restanteTurno = SEGUNDOS_POR_TURNO;
+        fraccionAplicada = 0;
+        inicioTurno = Date.now();
+        pintarReloj();
+        // Se mide con el reloj del sistema y no contando pasos: si el navegador
+        // frena el temporizador (pestania de fondo, celular bloqueado), al
+        // volver se cobra de una lo que falte en vez de quedarse atras.
+        relojTurno = setInterval(() => {
+          const transcurrido = (Date.now() - inicioTurno) / 1000;
+          restanteTurno = Math.max(0, SEGUNDOS_POR_TURNO - transcurrido);
+          const fraccion = Math.min(1, transcurrido / SEGUNDOS_POR_TURNO);
+          if (fraccion > fraccionAplicada) {
+            aplicarDeriva(fraccion - fraccionAplicada);
+            fraccionAplicada = fraccion;
+            updateUI();
+          }
+          pintarReloj();
+          if (revisarUmbrales()) return;   // se murio o la detectaron a mitad de turno
+          if (restanteTurno <= 0) {
+            detenerRelojTurno();
+            pasarTurnoSinAccion();
+          }
+        }, PASO_DERIVA);
+      }
+
+      // ---- Variantes de malla ---------------------------------------------
+      // Una malla por combinacion. Cada una trae sus propias UV, asi que cada
+      // una usa SUS texturas. Se cargan en segundo plano tras arrancar la
+      // partida, para no sumarle la espera a la pantalla de inicio.
+      //
+      //   modelo/base.obj    cerrado: sin mangas y sin capucha
+      //   modelo/mangas/     mangas desplegadas, cuello alto sin capucha
+      //   modelo/ambas/      mangas Y capucha desplegadas
+      //   modelo/capucha/    capucha puesta, sin mangas
+      const VARIANTES = {
+        capucha: { carpeta: 'modelo/capucha/', malla: null, pedido: false },
+        mangas:  { carpeta: 'modelo/mangas/',  malla: null, pedido: false },
+        ambas:   { carpeta: 'modelo/ambas/',   malla: null, pedido: false }
+      };
+
+      function cargarVariante(clave) {
+        const v = VARIANTES[clave];
+        if (!v || v.pedido || !window.__THREE__) return;
+        v.pedido = true;
+        const THREE = window.__THREE__;
+        const { OBJLoader } = window.__OBJLOADER__;
+
+        // Loader suelto, sin LoadingManager: un 404 aqui no debe disparar
+        // el respaldo a imagen de todo el juego.
+        const tl = new THREE.TextureLoader();
+        const mat = new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0.35 });
+        const mapas = [['map','diffuse'],['normalMap','normal'],['roughnessMap','roughness'],['metalnessMap','metallic']];
+        mapas.forEach(([prop, archivo]) => {
+          tl.load(v.carpeta + 'texture_' + archivo + '.jpg',
+            (tex) => {
+              // El mapa de color DEBE marcarse como sRGB; si no, three.js lo
+              // interpreta lineal y el chaleco se ve lavado y mas claro.
+              if (prop === 'map') tex.colorSpace = THREE.SRGBColorSpace;
+              mat[prop] = tex;
+              mat.needsUpdate = true;
+            },
+            undefined,
+            () => { console.info('Sin ' + archivo + ' para ' + clave); });
+        });
+
+        new OBJLoader().load(v.carpeta + 'base.obj', (obj) => {
+          obj.traverse((c) => {
+            if (c.isMesh) { c.material = mat; c.geometry.computeVertexNormals(); }
+          });
+          const box = new THREE.Box3().setFromObject(obj);
+          const center = box.getCenter(new THREE.Vector3());
+          obj.position.set(-center.x, -center.y, -center.z);
+          registrarTamano(box.getSize(new THREE.Vector3()));
+          obj.visible = false;
+          modelPivot.add(obj);
+          v.malla = obj;
+          actualizarMalla();
+        }, undefined, (err) => {
+          console.warn('No se pudo cargar ' + v.carpeta + 'base.obj:', err);
+        });
+      }
+
+      function cargarDesplegado() {
+        cargarVariante('capucha');
+        cargarVariante('mangas');
+        cargarVariante('ambas');
+      }
+
+      // Decide que malla mostrar segun lo que este desplegado. Cada estado
+      // tiene SU modelo: 'ambas' solo aparece con capucha Y mangas abiertas.
+      // Nunca se usa una malla con mangas para un estado sin mangas: mostrar
+      // ropa que el jugador no ha desplegado miente sobre el estado del juego.
+      // Por eso 'capucha' no cae a 'ambas' cuando falta: se queda en cerrado.
+      function actualizarMalla() {
+        if (!mallaBase) return;
+        let preferidas = [];
+        if (capuchaDesplegada && mangasDesplegadas) preferidas = ['ambas'];
+        else if (capuchaDesplegada) preferidas = ['capucha'];
+        else if (mangasDesplegadas) preferidas = ['mangas'];
+        const clave = preferidas.find(k => VARIANTES[k].malla);
+        const elegida = clave ? VARIANTES[clave].malla : null;
+        mallaBase.visible = !elegida;
+        Object.values(VARIANTES).forEach(v => { if (v.malla) v.malla.visible = (v.malla === elegida); });
+      }
+
+      // ---- Ventana grande de aviso ----------------------------------------
+      let avisoTimeout = null;
+      function mostrarAviso(emoji, titulo, texto, tipo) {
+        const cont = document.getElementById('aviso-evento');
+        const caja = document.getElementById('aviso-caja');
+        if (!cont || !caja) return;
+        document.getElementById('aviso-emoji').textContent = emoji;
+        document.getElementById('aviso-titulo').textContent = titulo;
+        document.getElementById('aviso-texto').textContent = texto || '';
+        caja.className = 'aviso-caja' + (tipo ? ' ' + tipo : '');
+        cont.classList.add('visible');
+        if (avisoTimeout) clearTimeout(avisoTimeout);
+        avisoTimeout = setTimeout(() => cont.classList.remove('visible'), 2600);
+      }
+
+      function pasarTurnoSinAccion() {
+        if (partidaTerminada) return;
+        if (activeQuestion) {
+          showMessage("Se te fue el tiempo sin responder la pregunta del chaleco.", "warning");
+        } else {
+          showMessage("Dejas pasar el tiempo. El frío y el polvo siguen avanzando.", "warning");
+        }
+        advanceTurn(false);
+      }
+
+      // DOM Elements
+      const valTemp = document.getElementById('val-temp');
+      const valAire = document.getElementById('val-aire');
+      const valBat = document.getElementById('val-bat');
+      const valLoc = document.getElementById('val-loc');
+
+      const barTemp = document.getElementById('bar-temp');
+      const barAire = document.getElementById('bar-aire');
+      const barBat = document.getElementById('bar-bat');
+      const barLoc = document.getElementById('bar-loc');
+
+      const turnBadge = document.getElementById('turn-badge');
+      const timeBadge = document.getElementById('time-badge');
+      const messageBar = document.getElementById('message-bar');
+      const appContainer = document.getElementById('app');
+
+      // 3D stage and fallback image
+      const stageContainer = document.getElementById('chaleco-stage');
+      const canvas3DContainer = document.getElementById('canvas-3d-container');
+      const fallbackImg = document.getElementById('chaleco-fallback-img');
+
+      // Triage UI
+      const triageCard = document.getElementById('triage-card');
+      const triageTimer = document.getElementById('triage-timer');
+      const triageQuestionText = document.getElementById('triage-question-text');
+
+      // Modals
+      const modalStart = document.getElementById('modal-start');
+      const btnEmpezar = document.getElementById('btn-empezar');
+      const preloadFill = document.getElementById('preload-fill');
+      const preloadPct = document.getElementById('preload-pct');
+      const preloadLabel = document.getElementById('preload-label');
+
+      const modalPocket = document.getElementById('modal-pocket');
+      const pocketBtnSilbato = document.getElementById('pocket-btn-silbato');
+      const pocketBtnLinterna = document.getElementById('pocket-btn-linterna');
+      const pocketBtnTapabocas = document.getElementById('pocket-btn-tapabocas');
+      const pocketBtnCerrar = document.getElementById('pocket-btn-cerrar');
+      const linternaStatusText = document.getElementById('linterna-status-text');
+      const tapabocasStatusText = document.getElementById('tapabocas-status-text');
+
+      const modalFinal = document.getElementById('modal-final');
+      const finalTitle = document.getElementById('final-title');
+      const finalText = document.getElementById('final-text');
+      const finalBadge = document.getElementById('final-badge');
+      const btnRestart = document.getElementById('btn-restart');
+
+      // Hotspots
+      const zoneInterruptor = document.getElementById('zone-interruptor');
+      const zoneCuello = document.getElementById('zone-cuello');
+      const zoneSisaIzq = document.getElementById('zone-sisa-izq');
+      const zoneSisaDer = document.getElementById('zone-sisa-der');
+      const zoneBolsillo = document.getElementById('zone-bolsillo');
+
+      // ==========================================
+      // 3D Engine Setup (Fixed Frontal View)
+      // ==========================================
+      let scene, camera, renderer;
+      let modelPivot = new THREE.Group();
+      let flashlightLight = null;
+      let dirLight = null;
+      let cameraBaseDist = 2.4;
+      // Dos mallas: el chaleco cerrado y el de capucha y mangas desplegadas.
+      let mallaBase = null, materialBase = null;
+      let cargandoDesplegado = false;
+      let vaivenT = 0;
+      let tamanoBase = null;
+      const tamanosVariantes = [];
+      function registrarTamano(size) { tamanosVariantes.push(size); recalcularEncuadre(); }
+
+      // Encuadra la camara para que quepa el modelo MAS GRANDE de los dos,
+      // por alto Y por ancho. Antes solo se usaba la altura, que es igual en
+      // ambos, y el desplegado (33% mas ancho) se salia del cuadro.
+      function recalcularEncuadre() {
+        if (!camera) return;
+        const tams = [tamanoBase, ...tamanosVariantes].filter(Boolean);
+        if (!tams.length) return;
+        const maxX = Math.max(...tams.map(t => t.x));
+        const maxY = Math.max(...tams.map(t => t.y));
+        const maxZ = Math.max(...tams.map(t => t.z));
+
+        // Ancho que ocupa al girar con el balanceo (+-7.5 grados)
+        const rad = 7.5 * Math.PI / 180;
+        const anchoGirado = maxX * Math.cos(rad) + maxZ * Math.sin(rad);
+
+        const tv = Math.tan(camera.fov * Math.PI / 360);
+        const porAlto  = (maxY / 2) / tv;
+        const porAncho = (anchoGirado / 2) / (tv * camera.aspect);
+
+        cameraBaseDist = Math.max(porAlto, porAncho) * 1.14; // margen
+        camera.position.set(0, 0, cameraBaseDist);
+        camera.lookAt(0, 0, 0);
+        camera.updateProjectionMatrix();
+      }
+      let is3DActive = false;
+
+      // 3D animation state
+      let shakeTime = 0;
+      let pulseTime = 0;
+      let breatheTime = 0;
+
+      function updatePreloadProgress(pct) {
+        const clamped = Math.min(100, Math.max(0, Math.round(pct)));
+        preloadFill.style.width = clamped + '%';
+        preloadPct.textContent = clamped + '%';
+        preloadLabel.textContent = `Cargando modelo 3D… ${clamped}%`;
+      }
+
+      function enableStartButton(statusText) {
+        btnEmpezar.disabled = false;
+        btnEmpezar.textContent = 'Empezar';
+        if (statusText) preloadLabel.textContent = statusText;
+        preloadFill.style.width = '100%';
+        preloadPct.textContent = '100%';
+      }
+
+      function activateImageFallback() {
+        if (is3DActive) return;
+        console.warn('Activando respaldo automático chaleco.png');
+        fallbackImg.style.display = 'block';
+        canvas3DContainer.style.display = 'none';
+        enableStartButton('Modelo 2D listo');
+      }
+
+      window.activateImageFallback = activateImageFallback;
+
+      function init3D() {
+        try {
+          const rect = stageContainer.getBoundingClientRect();
+          const w = rect.width || 400;
+          const h = rect.height || 480;
+
+          scene = new THREE.Scene();
+          camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 50);
+
+          renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          renderer.setSize(w, h);
+          renderer.outputColorSpace = THREE.SRGBColorSpace;
+          renderer.toneMapping = THREE.ACESFilmicToneMapping;
+          renderer.toneMappingExposure = 1.15;
+          canvas3DContainer.appendChild(renderer.domElement);
+
+          // Lighting: soft ambient so penumbra looks natural
+          const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
+          scene.add(ambientLight);
+
+          // Main directional light for folds & texture relief
+          dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+          dirLight.position.set(3, 4, 4);
+          scene.add(dirLight);
+
+          // Rear fill light
+          const fillLight = new THREE.DirectionalLight(0xdde8ff, 0.5);
+          fillLight.position.set(-3, 2, -2);
+          scene.add(fillLight);
+
+          // Real 3D Point Light for flashlight effect
+          flashlightLight = new THREE.PointLight(0xfffaea, 0, 7, 1.1);
+          flashlightLight.position.set(0.2, -0.2, 1.6);
+          scene.add(flashlightLight);
+
+          scene.add(modelPivot);
+
+          // Loading manager
+          let totalItems = 5;
+          let loadedItems = 0;
+          let objPercent = 0;
+
+          const loadingManager = new THREE.LoadingManager(
+            () => {
+              is3DActive = true;
+              fallbackImg.style.display = 'none';
+              enableStartButton('Modelo 3D listo');
+            },
+            (url, itemsLoaded, itemsTotal) => {
+              loadedItems = itemsLoaded;
+              totalItems = Math.max(totalItems, itemsTotal);
+              const overall = (loadedItems / totalItems) * 100;
+              updatePreloadProgress(Math.max(overall, objPercent));
+            },
+            (url) => {
+              console.warn('Error cargando recurso 3D:', url);
+              activateImageFallback();
+            }
+          );
+
+          const textureLoader = new THREE.TextureLoader(loadingManager);
+
+          const diffuseMap = textureLoader.load('modelo/texture_diffuse.jpg');
+          diffuseMap.colorSpace = THREE.SRGBColorSpace;
+          const normalMap = textureLoader.load('modelo/texture_normal.jpg');
+          const roughnessMap = textureLoader.load('modelo/texture_roughness.jpg');
+          const metalnessMap = textureLoader.load('modelo/texture_metallic.jpg');
+
+          const vestMaterial = new THREE.MeshStandardMaterial({
+            map: diffuseMap,
+            normalMap: normalMap,
+            roughnessMap: roughnessMap,
+            metalnessMap: metalnessMap,
+            roughness: 0.85,
+            metalness: 0.35
+          });
+
+          const objLoader = new OBJLoader(loadingManager);
+
+          objLoader.load(
+            'modelo/base.obj',
+            (obj) => {
+              obj.traverse((child) => {
+                if (child.isMesh) {
+                  child.material = vestMaterial;
+                  child.geometry.computeVertexNormals();
+                }
+              });
+
+              // Bounding box centering
+              const box = new THREE.Box3().setFromObject(obj);
+              const center = box.getCenter(new THREE.Vector3());
+              const size = box.getSize(new THREE.Vector3());
+
+              obj.position.x = -center.x;
+              obj.position.y = -center.y;
+              obj.position.z = -center.z;
+              modelPivot.add(obj);
+              mallaBase = obj;
+              materialBase = vestMaterial;
+
+              tamanoBase = size.clone();
+              recalcularEncuadre();
+
+              is3DActive = true;
+              fallbackImg.style.display = 'none';
+              enableStartButton('Modelo 3D listo');
+            },
+            (xhr) => {
+              if (xhr.lengthComputable && xhr.total > 0) {
+                objPercent = (xhr.loaded / xhr.total) * 80;
+                updatePreloadProgress(objPercent);
+              } else if (xhr.loaded > 0) {
+                const estTotal = 11832353;
+                objPercent = Math.min(85, (xhr.loaded / estTotal) * 80);
+                updatePreloadProgress(objPercent);
+              }
+            },
+            (err) => {
+              console.warn('Fallo al cargar base.obj:', err);
+              activateImageFallback();
+            }
+          );
+
+          // Handle window resize
+          function syncRendererSize() {
+            if (!renderer || !camera) return;
+            const r = stageContainer.getBoundingClientRect();
+            if (r.width > 0 && r.height > 0) {
+              camera.aspect = r.width / r.height;
+              camera.updateProjectionMatrix();
+              renderer.setSize(r.width, r.height);
+              recalcularEncuadre();
+            }
+          }
+          window.addEventListener('resize', syncRendererSize);
+
+          // El contenedor puede medir 0 cuando se inicializa (layout aun sin
+          // resolver, o la pantalla de inicio encima). Re-sincronizamos en
+          // cuanto tenga tamano real, para no quedar con un canvas invisible.
+          if (typeof ResizeObserver !== 'undefined') {
+            new ResizeObserver(syncRendererSize).observe(stageContainer);
+          }
+
+          // Render loop with fixed camera & 3D effects
+          function renderLoop() {
+            requestAnimationFrame(renderLoop);
+
+            if (!is3DActive) return;
+
+            // Flashlight real light control
+            if (flashlightLight) {
+              const targetIntensity = linternaEncendida ? 2.8 : 0;
+              flashlightLight.intensity += (targetIntensity - flashlightLight.intensity) * 0.15;
+            }
+
+            // Réplica 3D camera shake effect
+            if (shakeTime > 0) {
+              const intensity = (shakeTime / 40) * 0.04;
+              camera.position.x = (Math.random() - 0.5) * intensity;
+              camera.position.y = (Math.random() - 0.5) * intensity;
+              camera.position.z = cameraBaseDist + (Math.random() - 0.5) * intensity * 0.5;
+              shakeTime--;
+            } else {
+              camera.position.set(0, 0, cameraBaseDist);
+            }
+            camera.lookAt(0, 0, 0);
+
+            // Scale pulse for rescue vibration
+            if (pulseTime > 0) {
+              const s = 1.0 + Math.sin(pulseTime * 0.35) * 0.02;
+              modelPivot.scale.set(s, s, s);
+              pulseTime--;
+            }
+            // Scale pulse for guided breathing
+            else if (breatheTime > 0) {
+              const s = 1.0 + Math.sin(breatheTime * 0.05) * 0.015;
+              modelPivot.scale.set(s, s, s);
+              breatheTime--;
+            } else {
+              modelPivot.scale.set(1, 1, 1);
+            }
+
+            // Balanceo suave: el chaleco gira unos grados y sube y baja un
+            // poco, como colgado. Es pequeno a proposito, porque las zonas
+            // clicables van en coordenadas de pantalla y no deben descuadrar.
+            vaivenT += 0.0045;
+            const giro = Math.sin(vaivenT) * 0.13;          // ~7.5 grados
+            const cabeceo = Math.sin(vaivenT * 0.7) * 0.025;
+            modelPivot.rotation.y = giro;
+            modelPivot.rotation.z = Math.sin(vaivenT * 0.45) * 0.012;
+            modelPivot.position.y = cabeceo;
+
+            renderer.render(scene, camera);
+          }
+
+          renderLoop();
+
+          // Safety timeout: si la carga no termina, caer a la imagen.
+          // 60 s porque en GitHub Pages son ~16 MB por internet, no localhost.
+          setTimeout(() => {
+            if (!is3DActive) {
+              activateImageFallback();
+            }
+          }, 60000);
+
+        } catch (e) {
+          console.warn('Error inicializando WebGL 3D:', e);
+          activateImageFallback();
+        }
+      }
+
+      // Initialize 3D immediately
+      init3D();
+
+      // ==========================================
+      // UI & Turn Mechanics
+      // ==========================================
+
+      function formatSimulatedTime(t) {
+        const totalMinutes = t * 20;
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        return `Tiempo: ${h} h ${m} min`;
+      }
+
+      // ---- Mensajes del cuerpo -------------------------------------------
+      // Avisan que algo va mal y sugieren que hacer, sin dar la orden.
+      // Cada umbral se dispara una sola vez.
+      const umbralesCuerpo = [
+        { k: 'temp60', test: () => temperatura < 60, txt: "Empiezas a sentir frío. El concreto te está robando el calor." },
+        { k: 'temp40', test: () => temperatura < 40, txt: "Tiritas sin poder controlarlo. Necesitas aislarte del frío ya." },
+        { k: 'temp20', test: () => temperatura < 20, txt: "Casi no sientes las manos y te cuesta pensar. Esto es grave." },
+        { k: 'aire60', test: () => aire < 60, txt: "El polvo te raspa la garganta cada vez que respiras." },
+        { k: 'aire40', test: () => aire < 40, txt: "Te cuesta respirar. Cada bocanada trae más polvo que aire." },
+        { k: 'aire20', test: () => aire < 20, txt: "Apenas entra aire. Si no filtras el polvo, no aguantas mucho más." },
+        { k: 'bat40',  test: () => bateria < 40 && chalecoEncendido, txt: "El chaleco parpadea: la batería va por debajo de la mitad." },
+        { k: 'bat20',  test: () => bateria < 20 && chalecoEncendido, txt: "Queda muy poca batería. Si se apaga, nadie sabrá dónde estás." }
+      ];
+      const umbralesDisparados = new Set();
+
+      function revisarMensajesCuerpo() {
+        for (const u of umbralesCuerpo) {
+          if (!umbralesDisparados.has(u.k) && u.test()) {
+            umbralesDisparados.add(u.k);
+            showMessage(u.txt, 'body');
+            return; // uno por turno, para no saturar
+          }
+        }
+      }
+
+      // ---- Ficha de triage -----------------------------------------------
+      const etiquetasNivel = { 1: '1 · leve', 2: '2 · moderado', 3: '3 · serio', 4: '4 · crítico' };
+
+      function actualizarFicha() {
+        let peor = 0;
+        let respondidas = 0;
+        for (let i = 1; i <= 4; i++) {
+          const el = document.getElementById('ans-' + i);
+          if (!el) continue;
+          const v = answeredQuestions[i];
+          el.className = 'ficha-ans';
+          if (v) {
+            el.textContent = etiquetasNivel[v];
+            el.classList.add('n' + v);
+            peor = Math.max(peor, v);
+            respondidas++;
+          } else if (activeQuestion && activeQuestion.id === i) {
+            el.textContent = 'preguntando…';
+          } else if (turno > [0, 3, 6, 9, 12][i] + 1) {
+            el.textContent = 'sin responder';
+            el.classList.add('sin');
+          } else {
+            el.textContent = '—';
+          }
+        }
+
+        // Lectura del acelerometro: el chaleco sabe si te mueves, aunque no
+        // puede saber POR QUE no te mueves.
+        const imuEl = document.getElementById('ans-imu');
+        if (imuEl) {
+          const quieta = turno - turnoUltimoMovimiento;
+          imuEl.className = 'ficha-ans';
+          if (!chalecoEncendido) {
+            imuEl.textContent = 'apagado';
+          } else if (quieta <= 1) {
+            imuEl.textContent = 'activo';
+            imuEl.classList.add('n1');
+          } else {
+            const h = Math.floor(quieta * 20 / 60);
+            const m = (quieta * 20) % 60;
+            imuEl.textContent = 'quieta ' + (h ? h + ' h ' : '') + m + ' min';
+            imuEl.classList.add(quieta >= 6 ? 'n4' : quieta >= 3 ? 'n3' : 'n2');
+          }
+        }
+
+        const esc = document.getElementById('chip-escuchando');
+        if (esc) esc.classList.toggle('visible', turnosSilencio.includes(turno) && !partidaTerminada);
+
+        const prio = document.getElementById('ficha-prio');
+        if (prio) {
+          const nombres = { 0: 'Sin datos', 1: 'Verde', 2: 'Amarillo', 3: 'Naranja', 4: 'Rojo' };
+          prio.textContent = modoAutomatico ? 'Automático' : nombres[peor];
+          prio.className = 'ficha-prio' + (peor ? ' p' + peor : '');
+        }
+
+        // Aviso de inconsciencia
+        const aviso = document.getElementById('ficha-aviso');
+        if (aviso) {
+          if (modoAutomatico) {
+            aviso.textContent = 'Modo automático: el chaleco te dio por inconsciente y transmite solo con los sensores.';
+            aviso.classList.add('visible');
+          } else if (missedQuestionsCount > 0) {
+            const faltan = 3 - missedQuestionsCount;
+            aviso.textContent = 'Preguntas ignoradas: ' + missedQuestionsCount + ' de 3. Si ignoras ' +
+              faltan + ' más, el chaleco asumirá que estás inconsciente.';
+            aviso.classList.add('visible');
+          } else {
+            aviso.classList.remove('visible');
+          }
+        }
+      }
+
+      function updateUI() {
+        actualizarFicha();
+
+        // Tasa de perdida termica actual, para que se vea el efecto de
+        // desplegar: la barra sigue bajando pero mucho mas lento.
+        let lossAhora = 6;
+        if (capuchaDesplegada) lossAhora -= 3;
+        if (mangasDesplegadas) lossAhora -= 2;
+        if (rescateDetectado) lossAhora = lossAhora / 2;
+        const rateEl = document.getElementById('rate-temp');
+        if (rateEl) rateEl.textContent = '−' + lossAhora + '/turno';
+
+        // Indicadores de equipo
+        const chips = [
+          ['chip-capucha', capuchaDesplegada],
+          ['chip-mangas', mangasDesplegadas],
+          ['chip-n95', tapabocasPuesto],
+          ['chip-linterna', linternaEncendida]
+        ];
+        chips.forEach(([id, activo]) => {
+          const el = document.getElementById(id);
+          if (el) el.classList.toggle('activo', activo);
+        });
+
+        valTemp.textContent = Math.round(temperatura) + '%';
+        valAire.textContent = Math.round(aire) + '%';
+        valBat.textContent = Math.round(bateria) + '%';
+        valLoc.textContent = Math.round(localizacion) + '%';
+
+        barTemp.style.width = Math.max(0, Math.min(100, temperatura)) + '%';
+        barAire.style.width = Math.max(0, Math.min(100, aire)) + '%';
+        barBat.style.width = Math.max(0, Math.min(100, bateria)) + '%';
+        barLoc.style.width = Math.max(0, Math.min(100, localizacion)) + '%';
+
+        // Bars turn RED strictly when value is below 30
+        if (temperatura < 30) barTemp.classList.add('bar-danger');
+        else barTemp.classList.remove('bar-danger');
+
+        if (aire < 30) barAire.classList.add('bar-danger');
+        else barAire.classList.remove('bar-danger');
+
+        if (bateria < 30) barBat.classList.add('bar-danger');
+        else barBat.classList.remove('bar-danger');
+
+        if (localizacion < 30) barLoc.classList.add('bar-danger');
+        else barLoc.classList.remove('bar-danger');
+
+        // Turn & simulated time
+        turnBadge.textContent = `Turno ${turno} de 15`;
+        timeBadge.textContent = formatSimulatedTime(turno);
+
+        // Update pocket modal options
+        if (linternaEncendida) {
+          pocketBtnLinterna.textContent = 'Apagar';
+          pocketBtnLinterna.classList.add('btn-active');
+          linternaStatusText.textContent = 'Encendida (consume 12 de batería por turno)';
+        } else {
+          pocketBtnLinterna.textContent = 'Encender';
+          pocketBtnLinterna.classList.remove('btn-active');
+          linternaStatusText.textContent = 'Apagada (consume 12 de batería por turno si se enciende)';
+        }
+
+        if (tapabocasPuesto) {
+          pocketBtnTapabocas.textContent = 'Puesto';
+          pocketBtnTapabocas.disabled = true;
+          tapabocasStatusText.textContent = 'Puesto (reduciendo pérdida de aire a 1 por turno)';
+        } else {
+          pocketBtnTapabocas.textContent = 'Ponerse';
+          pocketBtnTapabocas.disabled = false;
+          tapabocasStatusText.textContent = 'Sin poner (reduce la pérdida de aire a 1 por turno)';
+        }
+
+        // Triage Card visibility
+        if (activeQuestion && !partidaTerminada) {
+          triageCard.style.display = 'block';
+          triageQuestionText.textContent = activeQuestion.texto;
+          const elapsed = turno - activeQuestionStartTurn;
+          const remaining = Math.max(1, 2 - elapsed);
+          triageTimer.textContent = remaining === 1 ? 'Último turno para responder' : 'Expira en 2 turnos';
+          document.body.classList.add('question-active');
+        } else {
+          triageCard.style.display = 'none';
+          document.body.classList.remove('question-active');
+        }
+      }
+
+      function showMessage(msg, type) {
+        messageBar.textContent = msg;
+        messageBar.className = 'message-bar';
+        if (type === 'highlight') messageBar.classList.add('event-highlight');
+        else if (type === 'warning') messageBar.classList.add('event-warning');
+        else if (type === 'danger') messageBar.classList.add('event-danger');
+        else if (type === 'body') messageBar.classList.add('body-msg');
+      }
+
+      function checkModoAutomatico() {
+        if (!modoAutomatico && missedQuestionsCount >= 3) {
+          modoAutomatico = true;
+          activeQuestion = null;
+          activeQuestionStartTurn = null;
+          showMessage("Modo automático activado: la IA asume pérdida de conciencia y transmite sola con sensores.", "warning");
+          mostrarAviso("🤖", "Modo automático", "No respondiste tres preguntas. El chaleco te da por inconsciente y transmite solo con los sensores.", "alerta");
+        }
+      }
+
+      // Advance turn logic
+      // Los umbrales que no pueden esperar al final del turno: la deteccion
+      // del rescate, la respiracion guiada y las tres muertes. Se consulta en
+      // cada paso de la deriva y tambien al cerrar el turno.
+      // Devuelve true si la partida ya termino.
+      function revisarUmbrales() {
+        if (partidaTerminada) return true;
+
+        // Deteccion del rescate
+        if (localizacion >= 100 && !rescateDetectado) {
+          rescateDetectado = true;
+          turnoRescateLlegada = turno + 2;
+
+          // 3D vibration pulse or 2D image pulse
+          pulseTime = 45;
+          fallbackImg.classList.add('chaleco-vibrate');
+          showMessage("El chaleco vibra. Te detectaron. Vienen por ti.", "highlight");
+          mostrarAviso("📡", "Te detectaron", "El chaleco vibra: el equipo de rescate recibió tu señal. Vienen por ti.", "bueno");
+          safeSetTimeout(() => {
+            fallbackImg.classList.remove('chaleco-vibrate');
+          }, 4000);
+        }
+
+        // Respiracion guiada
+        if (aire < 40 && turnoRespiracionGuiada !== turno) {
+          turnoRespiracionGuiada = turno;
+          respiracionGuiadaActiva = true;
+
+          // 3D breathing slow pulse or 2D image breathing
+          breatheTime = 120;
+          fallbackImg.classList.add('chaleco-breathe');
+          showMessage("El chaleco marca un ritmo lento. Respira con él.", "highlight");
+          mostrarAviso("🫁", "Respira con el chaleco", "Tu pulso se disparó. El chaleco marca un ritmo lento para que respires con él.", "alerta");
+          safeSetTimeout(() => {
+            fallbackImg.classList.remove('chaleco-breathe');
+          }, 4000);
+        }
+
+        // Muertes
+        if (temperatura <= 0) {
+          endGame('HIPOTERMIA', 'El concreto te robó el calor. Nunca desplegaste la manta térmica.', false);
+          return true;
+        }
+        if (aire <= 0) {
+          endGame('ASFIXIA', 'El polvo de concreto te cerró las vías respiratorias. El tapabocas N95 estaba en el bolsillo.', false);
+          return true;
+        }
+        if (bateria <= 0 && !rescateDetectado) {
+          endGame('SIN ENERGÍA', 'La baliza se apagó y nadie supo dónde buscar. La linterna consume mucho más que la radio.', false);
+          return true;
+        }
+        return false;
+      }
+
+      function advanceTurn(conMovimiento = true) {
+        if (conMovimiento) turnoUltimoMovimiento = turno;
+        if (partidaTerminada) return;
+
+        // 1. Cobrar lo que quede del turno. La deriva en vivo ya fue
+        // descontando segundo a segundo; aqui solo se completa la fraccion que
+        // falta, para que el total del turno sea el de la tabla aunque el
+        // jugador haya actuado a los dos segundos.
+        detenerRelojTurno();
+        aplicarDeriva(Math.max(0, 1 - fraccionAplicada));
+        fraccionAplicada = 1;
+
+        // 2-4. Deteccion, respiracion guiada y muertes. Es la misma revision
+        // que corre en vivo durante el turno.
+        if (revisarUmbrales()) return;
+
+        // 5. Increment turn
+        turno++;
+
+        // 6. Check question expiration (lasts 2 turns)
+        if (activeQuestion) {
+          if (turno - activeQuestionStartTurn >= 2) {
+            missedQuestionsCount++;
+            activeQuestion = null;
+            activeQuestionStartTurn = null;
+            checkModoAutomatico();
+          }
+        }
+
+        // 7. Check automatic mode (every turn)
+        checkModoAutomatico();
+
+        // 8. Check Rescue arrival (end of turn 15 or 2 turns after loc 100)
+        const rescueDueToLoc = rescateDetectado && (turno > turnoRescateLlegada);
+        const rescueDueToTurn15 = turno > 15;
+
+        if (rescueDueToLoc || rescueDueToTurn15) {
+          evaluateFinalRescate();
+          return;
+        }
+
+        // 9. Check environment events for the new turn
+        // Réplicas on turns 4 and 11
+        if (turnosReplica.includes(turno)) {
+          appContainer.classList.add('screen-shake');
+          shakeTime = 35; // 3D camera shake
+          aire = Math.max(0, aire - 5);
+          localizacion = Math.max(0, localizacion - 15);
+          showMessage("Réplica. Los escombros se mueven y la señal se pierde un momento.", "danger");
+          mostrarAviso("💥", "¡Réplica!", "Los escombros se mueven sobre ti y la señal se pierde un momento.", "peligro");
+          safeSetTimeout(() => {
+            appContainer.classList.remove('screen-shake');
+          }, 800);
+
+          if (aire <= 0) {
+            endGame('ASFIXIA', 'El polvo de concreto te cerró las vías respiratorias. El tapabocas N95 estaba en el bolsillo.', false);
+            return;
+          }
+        }
+        // Ventanas de silencio on turns 5, 8, 13
+        else if (turnosSilencio.includes(turno)) {
+          showMessage("Arriba se apagaron las máquinas. Están escuchando.", "highlight");
+          mostrarAviso("👂", "Están escuchando", "Arriba apagaron las máquinas. Es el momento del silbato.", "alerta");
+        }
+
+        // 10. Check if a new triage question appears
+        if (!modoAutomatico && triageQuestions[turno]) {
+          activeQuestion = triageQuestions[turno];
+          activeQuestionStartTurn = turno;
+        }
+
+        // 11. Mensaje del cuerpo, solo si este turno no hubo evento ni
+        // pregunta nueva que ya estan ocupando la barra de mensajes.
+        const huboEvento = (turnosReplica.includes(turno) ||
+                            turnosSilencio.includes(turno) ||
+                            !!triageQuestions[turno]);
+        if (!huboEvento) revisarMensajesCuerpo();
+
+        updateUI();
+        reiniciarRelojTurno();
+      }
+
+      // El acelerometro aporta, pero no diagnostica: inmovilidad no es lo
+      // mismo que compresion. Por eso cambia el texto, no el desenlace.
+      // Los equipos USAR evaluan atrapamiento antes de extraer: no responder
+      // no es una condena, es perder la certeza. Se sortea si lo detectan.
+      function probabilidadDeteccion() {
+        let p = 0.55;                                   // evaluacion de rutina
+        if (turno - turnoUltimoMovimiento >= 3) p += 0.25; // el IMU los alerto
+        if (chalecoEncendido) p += 0.10;                // tenian signos vitales
+        return Math.min(p, 0.90);
+      }
+
+      const PROTOCOLO = 'Le canalizaron una vía de grueso calibre y le pasaron suero salino ' +
+        'antes de mover la losa, más bicarbonato para frenar la subida de potasio, y dos ' +
+        'torniquetes por encima de la pierna justo antes de levantarla.';
+
+      function textoAplastamiento() {
+        const quieta = turno - turnoUltimoMovimiento;
+        const base = 'Te encontraron: la baliza y tus signos vitales los guiaron hasta el hueco. ';
+        const cierre = ' Te levantaron como a cualquiera, la sangre represada volvió de golpe a tu circulación y tu corazón se detuvo a los pocos minutos. No fue el terremoto: fue el rescate.';
+        if (quieta >= 3) {
+          const h = Math.floor(quieta * 20 / 60), m = (quieta * 20) % 60;
+          return base + 'El acelerómetro del chaleco alcanzó a avisar que llevabas ' +
+            (h ? h + ' h ' : '') + m + ' min sin moverte, y eso los puso en alerta. ' +
+            'Pero estar quieta no es lo mismo que estar comprimida: podías estar inconsciente, o simplemente sin fuerzas. ' +
+            'Ningún sensor distingue eso. Solo lo decía la pregunta 3, y nunca la respondiste.' + cierre;
+        }
+        return base + 'Pero un sensor mide pulso, oxígeno, temperatura y movimiento — no puede ver que llevas horas con una pierna bajo una losa. ' +
+          'Eso solo lo decía la pregunta 3, y nunca la respondiste.' + cierre;
+      }
+
+      function evaluateFinalRescate() {
+        const q1 = answeredQuestions[1] !== null;
+        const q2 = answeredQuestions[2] !== null;
+        const q3 = answeredQuestions[3] !== null;
+        const q4 = answeredQuestions[4] !== null;
+
+        // Te encuentran por la baliza y los signos vitales del parche, no
+        // por el triage: por eso llegan hasta ti aunque no hayas respondido
+        // nada. Lo que los sensores NO pueden ver es la compresion de un
+        // miembro, y eso solo lo dice la pregunta 3.
+        if (q1 && q2 && q3 && q4) {
+          endGame(
+            'RESCATADA CON ÉXITO',
+            'La baliza los llevó hasta ti y tu triage completo les dijo cómo estabas antes de tocarte. ' + PROTOCOLO + ' Nada fue improvisado: saliste bien.',
+            true
+          );
+        } else if (q3) {
+          endGame(
+            'RESCATADA',
+            'La baliza los llevó hasta ti. No tenían tu cuadro completo, pero sí lo único que ningún sensor podía adivinar: que tenías el cuerpo atrapado. Llegaron sabiéndolo. ' + PROTOCOLO,
+            true
+          );
+        } else {
+          // No respondio la pregunta 3, o quedo en modo automatico.
+          // El equipo evalua atrapamiento en el sitio: puede detectarlo o no.
+          const alertadosPorIMU = (turno - turnoUltimoMovimiento) >= 3;
+          if (Math.random() < probabilidadDeteccion()) {
+            endGame(
+              'RESCATADA POR POCO',
+              'La baliza los llevó hasta ti, pero llegaron sin saber cómo estabas. ' +
+              (alertadosPorIMU
+                ? 'El acelerómetro les marcó que llevabas horas sin moverte y eso los hizo desconfiar: antes de mover nada, palparon y '
+                : 'Antes de mover nada, el jefe de equipo hizo la evaluación de atrapamiento de rutina y ') +
+              'encontraron la pierna comprimida bajo la losa. ' + PROTOCOLO +
+              ' Saliste viva por el protocolo del equipo, no por tu información. Con la pregunta 3 respondida habrían llegado preparados desde el primer minuto.',
+              true
+            );
+          } else {
+            endGame('SÍNDROME DE APLASTAMIENTO', textoAplastamiento(), false);
+          }
+        }
+      }
+
+      function endGame(title, text, isVictory) {
+        partidaTerminada = true;
+        stopAllTimers();
+        shakeTime = 0;
+        pulseTime = 0;
+        breatheTime = 0;
+        updateUI();
+
+        finalTitle.textContent = title;
+        finalText.textContent = text;
+
+        if (isVictory) {
+          finalBadge.textContent = 'Misión cumplida';
+          finalBadge.className = 'final-badge victory';
+        } else {
+          finalBadge.textContent = 'Fin de la partida';
+          finalBadge.className = 'final-badge defeat';
+        }
+
+        modalFinal.classList.add('active');
+      }
+
+      // Actions:
+      // 1. Encender el chaleco
+      function accionInterruptor() {
+        if (partidaTerminada) return;
+
+        if (chalecoEncendido) {
+          showMessage("El chaleco ya está encendido.");
+          return;
+        }
+
+        chalecoEncendido = true;
+        showMessage("Chaleco encendido. La baliza de radio transmite señal de rescate.", "highlight");
+        advanceTurn();
+      }
+
+      // 2. Capucha térmica
+      function accionCuello() {
+        if (partidaTerminada) return;
+
+        if (capuchaDesplegada) {
+          showMessage("La capucha ya está desplegada.");
+          return;
+        }
+
+        capuchaDesplegada = true;
+        actualizarMalla();
+        // Recuperacion inmediata: al cortar la perdida por radiacion el
+        // cuerpo recupera algo de golpe, y ademas hace visible la accion.
+        temperatura = Math.min(100, temperatura + 8);
+        showMessage("Capucha térmica desplegada. Conserva el calor corporal.");
+        advanceTurn();
+      }
+
+      // 3. Mangas térmicas
+      function accionMangas() {
+        if (partidaTerminada) return;
+
+        if (mangasDesplegadas) {
+          showMessage("Las mangas ya están desplegadas.");
+          return;
+        }
+
+        mangasDesplegadas = true;
+        actualizarMalla();
+        temperatura = Math.min(100, temperatura + 8);
+        showMessage("Mangas térmicas desplegadas. Máxima retención de calor.");
+        advanceTurn();
+      }
+
+      // 4. Bolsillo: open menu
+      function accionAbrirBolsillo() {
+        if (partidaTerminada) return;
+        modalPocket.classList.add('active');
+      }
+
+      // 4a. Silbato
+      function accionSilbato() {
+        if (partidaTerminada) return;
+        modalPocket.classList.remove('active');
+
+        // Check silence window in current turn (5, 8, 13)
+        if (turnosSilencio.includes(turno)) {
+          localizacion = Math.min(100, localizacion + 40);
+          showMessage("Soplaste el silbato con fuerza. Te escucharon arriba a través de los escombros.", "highlight");
+        } else {
+          aire = Math.max(0, aire - 8);
+          showMessage("Soplaste el silbato, pero arriba hay demasiado ruido de maquinaria. Gastaste aire para nada.", "danger");
+          mostrarAviso("\u{1F62E}\u{200D}\u{1F4A8}", "Aire desperdiciado",
+            "Nadie te oyó con las máquinas encendidas, y soplar te costó aire. Espera a que hagan silencio.", "peligro");
+        }
+
+        advanceTurn();
+      }
+
+      // 4b. Linterna toggle
+      function accionLinterna() {
+        if (partidaTerminada) return;
+        modalPocket.classList.remove('active');
+
+        if (!linternaEncendida) {
+          linternaEncendida = true;
+          showMessage("Linterna encendida. Ilumina el hueco pero consume mucha batería.");
+        } else {
+          linternaEncendida = false;
+          showMessage("Linterna apagada. Ahorras batería.");
+        }
+
+        advanceTurn();
+      }
+
+      // 4c. Tapabocas N95
+      function accionTapabocas() {
+        if (partidaTerminada) return;
+
+        if (tapabocasPuesto) {
+          modalPocket.classList.remove('active');
+          showMessage("El tapabocas N95 ya está puesto.");
+          return;
+        }
+
+        tapabocasPuesto = true;
+        modalPocket.classList.remove('active');
+        showMessage("Te pusiste el tapabocas N95. Filtra el polvo de concreto.");
+        advanceTurn();
+      }
+
+      // 5. Responder el triage (1 a 4)
+      function responderTriage(nivel) {
+        if (partidaTerminada) return;
+
+        if (!activeQuestion) {
+          showMessage("No hay ninguna pregunta de triage activa en este momento.");
+          return;
+        }
+
+        const qId = activeQuestion.id;
+        answeredQuestions[qId] = nivel;
+        activeQuestion = null;
+        activeQuestionStartTurn = null;
+
+        showMessage(`Respuesta de triage registrada (nivel ${nivel}). Datos transmitidos.`);
+        advanceTurn();
+      }
+
+      // Reset game
+      function resetGame() {
+        stopAllTimers();
+        umbralesDisparados.clear();
+        generarEventos();
+        turnoUltimoMovimiento = 1;
+        shakeTime = 0;
+        pulseTime = 0;
+        breatheTime = 0;
+
+        turno = 1;
+        temperatura = 80;
+        aire = 100;
+        bateria = 100;
+        localizacion = 0;
+
+        chalecoEncendido = false;
+        capuchaDesplegada = false;
+        mangasDesplegadas = false;
+        tapabocasPuesto = false;
+        linternaEncendida = false;
+
+        rescateDetectado = false;
+        turnoRescateLlegada = null;
+        respiracionGuiadaActiva = false;
+        turnoRespiracionGuiada = null;
+
+        activeQuestion = null;
+        activeQuestionStartTurn = null;
+        answeredQuestions = { 1: null, 2: null, 3: null, 4: null };
+        missedQuestionsCount = 0;
+        modoAutomatico = false;
+        partidaTerminada = false;
+
+        modalFinal.classList.remove('active');
+        modalPocket.classList.remove('active');
+        fallbackImg.className = 'chaleco-img';
+        appContainer.className = '';
+
+        showMessage("Estás atrapada bajo los escombros a oscuras. Enciende el chaleco para comenzar.");
+        partidaIniciada = true;
+        actualizarMalla();
+        updateUI();
+        reiniciarRelojTurno();
+      }
+
+      // Event Listeners
+      btnEmpezar.addEventListener('click', () => {
+        if (btnEmpezar.disabled) return;
+        modalStart.classList.remove('active');
+        showMessage("Estás atrapada bajo los escombros a oscuras. Enciende el chaleco para comenzar.");
+        partidaIniciada = true;
+        cargarDesplegado();
+        updateUI();
+        reiniciarRelojTurno();
+      });
+
+      btnRestart.addEventListener('click', resetGame);
+
+      // Hotspots interactions
+      zoneInterruptor.addEventListener('click', accionInterruptor);
+      zoneCuello.addEventListener('click', accionCuello);
+      zoneSisaIzq.addEventListener('click', accionMangas);
+      zoneSisaDer.addEventListener('click', accionMangas);
+      zoneBolsillo.addEventListener('click', accionAbrirBolsillo);
+
+      // Pocket menu buttons
+      pocketBtnSilbato.addEventListener('click', accionSilbato);
+      pocketBtnLinterna.addEventListener('click', accionLinterna);
+      pocketBtnTapabocas.addEventListener('click', accionTapabocas);
+      pocketBtnCerrar.addEventListener('click', () => {
+        modalPocket.classList.remove('active');
+      });
+
+      // Triage buttons on bottom card
+      document.querySelectorAll('.btn-relief').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const val = parseInt(btn.getAttribute('data-answer'), 10);
+          responderTriage(val);
+        });
+      });
+
+      // Triage buttons on the vest
+      document.querySelectorAll('.triage-btn-vest').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const val = parseInt(btn.getAttribute('data-triage'), 10);
+          responderTriage(val);
+        });
+      });
+
+      // Keyboard accessibility
+      document.querySelectorAll('.hotspot').forEach(el => {
+        el.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            el.click();
+          }
+        });
+      });
+
+      // Close modal on background click
+      modalPocket.addEventListener('click', (e) => {
+        if (e.target === modalPocket) modalPocket.classList.remove('active');
+      });
+
+      // Initial render
+      updateUI();
+    })();
+  </script>
+</body>
+</html>
